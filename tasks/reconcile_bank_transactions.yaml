@@ -1,0 +1,76 @@
+agent: reconciliation_agent
+description: >
+  Match bank transactions with recorded invoices and payments.
+  
+  BANK TRANSACTIONS:
+  {bank_transactions}
+  
+  UNMATCHED INVOICES (Receivables):
+  {outstanding_receivables}
+  
+  UNMATCHED BILLS (Payables):
+  {outstanding_payables}
+  
+  MATCHING ALGORITHM:
+  
+  Step 1 - Exact Match:
+  - Amount matches exactly
+  - Reference number matches (invoice #, UTR, etc.)
+  → Confidence: 98-100%
+  
+  Step 2 - Fuzzy Match:
+  - Amount within ±1% (bank charges, TDS)
+  - Date within ±5 days
+  - Name similarity > 80% (handle variations)
+  → Confidence: 80-95%
+  
+  Step 3 - Aggregate Match:
+  - Multiple invoices sum to bank transaction
+  - Same customer/vendor
+  → Confidence: 75-90%
+  
+  Step 4 - Split Match:
+  - One invoice, multiple payments
+  - Partial payment pattern
+  → Confidence: 70-85%
+  
+  DISCREPANCY HANDLING:
+  - Small differences (< ₹100): Likely bank charges, suggest auto-adjust
+  - Medium differences (₹100-1000): Likely TDS, verify rate
+  - Large differences: Flag for human review
+  
+  OUTPUT FORMAT (JSON):
+  {
+    "reconciliation_summary": {
+      "bank_transactions_count": 97,
+      "matched": 94,
+      "unmatched_bank": 2,
+      "unmatched_books": 1,
+      "match_rate": "96.9%"
+    },
+    "matched_items": [
+      {
+        "bank_txn_id": "TXN001",
+        "matched_to": "INV-4521",
+        "match_type": "exact|fuzzy|aggregate|split",
+        "confidence": 0.98,
+        "bank_amount": 45200,
+        "book_amount": 45000,
+        "difference": 200,
+        "difference_reason": "Bank charges",
+        "suggested_action": "auto_adjust|manual_review"
+      }
+    ],
+    "unmatched_bank_transactions": [...],
+    "unmatched_book_entries": [...],
+    "suggested_adjustments": [
+      {
+        "type": "bank_charges",
+        "amount": 200,
+        "journal_entry": {...}
+      }
+    ]
+  }
+expected_output: >
+  A complete reconciliation report with matched items, unmatched items,
+  confidence scores, and suggested adjustments.

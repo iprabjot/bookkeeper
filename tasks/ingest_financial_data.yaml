@@ -1,0 +1,41 @@
+agent: data_ingestion_agent
+description: >
+  Extract and normalize financial data from the provided sources.
+  
+  INPUT SOURCES:
+  {data_sources}
+  
+  FOR EACH DOCUMENT:
+  1. Identify document type (invoice, receipt, bank statement, etc.)
+  2. Extract all relevant fields
+  3. Normalize to standard format
+  4. Assign confidence score to each field
+  5. Flag items with confidence < 80% for human review
+  
+  OUTPUT FORMAT (JSON):
+  {
+    "documents_processed": <count>,
+    "successful": <count>,
+    "flagged_for_review": <count>,
+    "extracted_data": [
+      {
+        "doc_id": "unique_id",
+        "doc_type": "invoice|receipt|bank_statement|expense",
+        "source": "email|upload|api",
+        "confidence": 0.95,
+        "fields": {
+          "vendor_name": {"value": "...", "confidence": 0.98},
+          "invoice_number": {"value": "...", "confidence": 0.99},
+          "date": {"value": "YYYY-MM-DD", "confidence": 0.97},
+          "amount": {"value": 10000.00, "confidence": 0.99},
+          "gst_amount": {"value": 1800.00, "confidence": 0.95},
+          "line_items": [...]
+        },
+        "needs_review": false,
+        "review_reason": null
+      }
+    ]
+  }
+expected_output: >
+  A JSON object containing all extracted financial data with confidence
+  scores and flags for items needing human review.

@@ -1,0 +1,88 @@
+agent: reporting_agent
+description: >
+  Generate financial statements from the trial balance.
+  
+  TRIAL BALANCE:
+  {trial_balance}
+  
+  REPORTING PERIOD:
+  {period_start} to {period_end}
+  
+  PRIOR PERIOD DATA (for comparison):
+  {prior_period_data}
+  
+  GENERATE THE FOLLOWING:
+  
+  1. BALANCE SHEET (as per Schedule III):
+     - Assets (Non-current, Current)
+     - Liabilities (Non-current, Current)
+     - Equity (Share capital, Reserves)
+  
+  2. PROFIT & LOSS STATEMENT:
+     - Revenue from operations
+     - Other income
+     - Cost of materials consumed
+     - Employee benefits expense
+     - Other expenses
+     - Tax expense
+     - Profit/(Loss) for the period
+  
+  3. CASH FLOW STATEMENT (Indirect Method):
+     - Operating activities
+     - Investing activities
+     - Financing activities
+  
+  4. KEY RATIOS:
+     - Current ratio
+     - Quick ratio
+     - Debt-to-equity
+     - Net profit margin
+     - Return on equity
+  
+  5. VARIANCE ANALYSIS:
+     - Compare each line item to prior period
+     - Flag significant variances (>10%)
+     - Provide brief explanation for major variances
+  
+  OUTPUT FORMAT (JSON):
+  {
+    "balance_sheet": {
+      "as_of_date": "2025-11-30",
+      "assets": {
+        "non_current": [...],
+        "current": [...],
+        "total": 5000000
+      },
+      "liabilities": {...},
+      "equity": {...}
+    },
+    "profit_and_loss": {
+      "period": "Nov 2025",
+      "revenue": 4500000,
+      "expenses": 3800000,
+      "profit_before_tax": 700000,
+      "tax": 175000,
+      "net_profit": 525000
+    },
+    "cash_flow": {...},
+    "ratios": {
+      "current_ratio": 1.8,
+      "net_profit_margin": "11.7%"
+    },
+    "variance_analysis": [
+      {
+        "line_item": "Revenue",
+        "current": 4500000,
+        "prior": 4000000,
+        "variance": 500000,
+        "variance_pct": "12.5%",
+        "flag": "significant_increase",
+        "explanation": "New B2B client onboarded in Nov"
+      }
+    ]
+  }
+expected_output: >
+  Complete financial statements with Balance Sheet, P&L, Cash Flow,
+  key ratios, and variance analysis.
+context:
+  - update_general_ledger

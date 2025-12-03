@@ -1,0 +1,62 @@
+agent: journal_entry_agent
+description: >
+  Create double-entry journal entries for the extracted financial data.
+  
+  CHART OF ACCOUNTS:
+  {chart_of_accounts}
+  
+  EXTRACTED DATA:
+  {extracted_data}
+  
+  FOR EACH TRANSACTION:
+  1. Identify the nature of transaction
+  2. Determine applicable accounts from Chart of Accounts
+  3. Calculate GST treatment:
+     - B2B Intra-state: CGST + SGST (each 50% of GST rate)
+     - B2B Inter-state: IGST (full GST rate)
+     - Check for reverse charge applicability
+  4. Apply TDS if applicable (check vendor TDS category)
+  5. Create balanced journal entry (DR = CR)
+  6. Write clear narration
+  
+  VALIDATION RULES:
+  - Total Debits MUST equal Total Credits
+  - All account codes must exist in Chart of Accounts
+  - GST must be correctly split (CGST/SGST or IGST)
+  - High value transactions (> ₹1,00,000) need human approval
+  - New vendors need human approval
+  
+  OUTPUT FORMAT (JSON):
+  {
+    "journal_entries": [
+      {
+        "entry_id": "JE-2025-001",
+        "date": "2025-11-27",
+        "narration": "Purchase of office supplies from Amazon India",
+        "reference": "INV-AMZ-12345",
+        "lines": [
+          {"account_code": "5100", "account_name": "Office Supplies", "debit": 5000, "credit": 0},
+          {"account_code": "2310", "account_name": "CGST Input", "debit": 450, "credit": 0},
+          {"account_code": "2320", "account_name": "SGST Input", "debit": 450, "credit": 0},
+          {"account_code": "3100", "account_name": "Accounts Payable", "debit": 0, "credit": 5900}
+        ],
+        "total_debit": 5900,
+        "total_credit": 5900,
+        "status": "auto_approved|pending_approval",
+        "approval_reason": null,
+        "confidence": 0.96
+      }
+    ],
+    "summary": {
+      "total_entries": 12,
+      "auto_approved": 10,
+      "pending_approval": 2,
+      "total_debit_amount": 482350,
+      "total_credit_amount": 482350
+    }
+  }
+expected_output: >
+  A JSON object containing balanced journal entries ready for posting,
+  with entries requiring approval clearly flagged.
+context:
+  - ingest_financial_data

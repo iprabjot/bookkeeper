@@ -1,0 +1,54 @@
+agent: ledger_agent
+description: >
+  Post approved journal entries to the General Ledger and generate
+  trial balance.
+  
+  APPROVED JOURNAL ENTRIES:
+  {approved_entries}
+  
+  CURRENT LEDGER STATE:
+  {current_ledger}
+  
+  POSTING RULES:
+  1. Only post entries with status "approved"
+  2. Update running balance for each affected account
+  3. Maintain audit trail (who approved, when posted)
+  4. Recalculate trial balance after all postings
+  
+  VALIDATION:
+  - Trial balance MUST balance (Total DR = Total CR)
+  - All account balances must be mathematically correct
+  - No duplicate postings (check entry_id)
+  
+  OUTPUT FORMAT (JSON):
+  {
+    "posting_summary": {
+      "entries_posted": 10,
+      "accounts_affected": 15,
+      "posting_timestamp": "2025-11-27T10:30:00Z"
+    },
+    "updated_balances": [
+      {
+        "account_code": "1100",
+        "account_name": "Cash and Bank",
+        "opening_balance": 500000,
+        "total_debits": 125000,
+        "total_credits": 75000,
+        "closing_balance": 550000
+      }
+    ],
+    "trial_balance": {
+      "as_of_date": "2025-11-27",
+      "accounts": [
+        {"code": "1100", "name": "Cash", "debit": 550000, "credit": 0},
+        {"code": "3100", "name": "Payables", "debit": 0, "credit": 125000}
+      ],
+      "total_debit": 1250000,
+      "total_credit": 1250000,
+      "is_balanced": true
+    }
+  }
+expected_output: >
+  Updated ledger balances and a balanced trial balance.
+context:
+  - generate_journal_entries
