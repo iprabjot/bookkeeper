@@ -47,31 +47,13 @@ pip install -r requirements.txt
 
 ### 4. Set Up Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root by copying the example file:
 
-```env
-# Database
-DATABASE_URL=postgresql://username:password@localhost:5432/bookkeeper
-
-# JWT Authentication
-JWT_SECRET_KEY=your-secret-key-change-in-production
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# AI/LLM (Optional - for enhanced invoice extraction)
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_API_BASE=https://openrouter.ai/api/v1
-OPENAI_MODEL_NAME=openai/gpt-4o-mini
-
-# Email (Optional - for user notifications)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASSWORD=your_app_password
-EMAIL_FROM=your_email@gmail.com
-EMAIL_FROM_NAME=Bookkeeper
+```bash
+cp .env.example .env
 ```
+
+Then edit `.env` with your actual credentials. See [.env.example](.env.example) for all available environment variables and their descriptions.
 
 ### 5. Set Up Database
 

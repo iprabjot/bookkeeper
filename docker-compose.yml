@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bookkeeper_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bookkeeper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookkeeper}
+      POSTGRES_DB: ${POSTGRES_DB:-bookkeeper}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bookkeeper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: bookkeeper_app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bookkeeper}:${POSTGRES_PASSWORD:-bookkeeper}@db:5432/${POSTGRES_DB:-bookkeeper}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Bookkeeper}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://openrouter.ai/api/v1}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-openai/gpt-4o-mini}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./reports:/app/reports
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting API server...' &&
+        uvicorn api.main:app --host 0.0.0.0 --port 8000
+      "
+
+volumes:
+  postgres_data:
+
