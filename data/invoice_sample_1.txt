@@ -1,9 +1,0 @@
-TAX INVOICE
-Amazon Seller Services
-Invoice No: AMZ-99821
-Date: 2025-02-12
-Subtotal: 1200
-CGST: 108
-SGST: 108
-Total: 1416
-Item: Webcam HD 1080p (1 unit)
