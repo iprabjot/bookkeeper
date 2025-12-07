@@ -41,7 +41,11 @@ env/
 output/
 test_output/
 quick_test/
+reports/
 *.csv
+
+# Legacy reports directory (database-backed now)
+reports/
 
 # Temporary files
 *.tmp

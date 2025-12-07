@@ -24,3 +24,7 @@ agent:
     - Flagged with key insights and anomalies
   verbose: true
   allow_delegation: false
+
+
+
+  # Generate comprehensive financial statements from {trial_balance} for reporting period {period_start} to {period_end} with comparison to {prior_period_data}. Generate: 1) Balance Sheet as per Schedule III (Assets, Liabilities, Equity), 2) Profit & Loss Statement (Revenue, Expenses, Tax, Net Profit), 3) Cash Flow Statement using Indirect Method, 4) Key financial ratios (current ratio, quick ratio, debt-to-equity, net profit margin, ROE),
