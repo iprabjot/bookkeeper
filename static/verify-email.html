@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Verify Email</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <div class="text-center mb-8">
+                <div class="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-envelope-open text-blue-600 text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                    Verify Your Email
+                </h1>
+                <p class="text-gray-600">Please wait while we verify your email address</p>
+            </div>
+
+            <div id="message" class="mb-4"></div>
+
+            <div id="loading" class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-500">Verifying your email...</p>
+            </div>
+
+            <div id="success" class="hidden text-center">
+                <div class="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-check text-green-600 text-2xl"></i>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Email Verified!</h2>
+                <p class="text-gray-600 mb-6">Your email address has been successfully verified.</p>
+                <a href="index.html" class="btn-primary inline-block">
+                    <i class="fas fa-arrow-right mr-2"></i>Go to Dashboard
+                </a>
+            </div>
+
+            <div id="error" class="hidden text-center">
+                <div class="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-times text-red-600 text-2xl"></i>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Verification Failed</h2>
+                <p class="text-gray-600 mb-6" id="error-message"></p>
+                <a href="index.html" class="btn-secondary inline-block">
+                    <i class="fas fa-arrow-left mr-2"></i>Go to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+
+            const loadingEl = document.getElementById('loading');
+            const successEl = document.getElementById('success');
+            const errorEl = document.getElementById('error');
+            const errorMessageEl = document.getElementById('error-message');
+
+            if (!token) {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                errorMessageEl.textContent = 'No verification token provided. Please check your email for the verification link.';
+                return;
+            }
+
+            try {
+                await window.verifyEmail(token);
+                loadingEl.classList.add('hidden');
+                successEl.classList.remove('hidden');
+            } catch (error) {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                errorMessageEl.textContent = error.message || 'Invalid or expired verification token. Please request a new verification email.';
+            }
+        });
+    </script>
+</body>
+</html>
+

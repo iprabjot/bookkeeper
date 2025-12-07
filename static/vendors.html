@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Vendors</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <i class="fas fa-book text-blue-600 mr-2"></i>Bookkeeper
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="index.html" class="nav-link">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="invoices.html" class="nav-link">
+                    <i class="fas fa-file-invoice w-5"></i>
+                    <span>Invoices</span>
+                </a>
+                <a href="bank-statements.html" class="nav-link">
+                    <i class="fas fa-university w-5"></i>
+                    <span>Bank Statements</span>
+                </a>
+                <a href="reports.html" class="nav-link">
+                    <i class="fas fa-chart-bar w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="vendors.html" class="nav-link active">
+                    <i class="fas fa-truck w-5"></i>
+                    <span>Vendors</span>
+                </a>
+                <a href="buyers.html" class="nav-link">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Buyers</span>
+                </a>
+                <a href="users.html" class="nav-link">
+                    <i class="fas fa-user-shield w-5"></i>
+                    <span>Users</span>
+                </a>
+                <a href="company.html" class="nav-link">
+                    <i class="fas fa-building w-5"></i>
+                    <span>Company</span>
+                </a>
+            </nav>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">Vendors</h2>
+                        <p class="text-sm text-gray-500" id="company-name-nav">Loading...</p>
+                    </div>
+                    <button onclick="showAddModal()" class="btn-primary">
+                        <i class="fas fa-plus mr-2"></i>Add Vendor
+                    </button>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-6">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <p class="text-sm text-gray-500 mb-4">Vendors are automatically created when purchase invoices are uploaded, or you can add them manually.</p>
+                    
+                    <div id="vendors-loading" class="flex items-center justify-center h-32">
+                        <div class="text-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            <p class="text-sm text-gray-500">Loading vendors...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="vendors-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
+                    
+                    <div class="table-container hidden" id="vendors-table-container">
+                        <table id="vendors-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>GSTIN</th>
+                                    <th>Address</th>
+                                    <th>Contact</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendors-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add Vendor Modal -->
+    <div id="add-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Add Vendor</h3>
+                <button onclick="hideAddModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="vendor-form" onsubmit="addVendor(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <input type="text" id="vendor-name" class="form-input" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">GSTIN</label>
+                        <input type="text" id="vendor-gstin" class="form-input">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea id="vendor-address" class="form-input" rows="3"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Contact Info</label>
+                        <input type="text" id="vendor-contact" class="form-input">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex gap-3">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save mr-2"></i>Add Vendor
+                    </button>
+                    <button type="button" onclick="hideAddModal()" class="btn-secondary">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+            
+            <div id="vendor-message" class="mt-4"></div>
+        </div>
+    </div>
+
+    <script src="/static/api.js"></script>
+    <script>
+        async function loadVendors() {
+            const loadingEl = document.getElementById('vendors-loading');
+            const errorEl = document.getElementById('vendors-error');
+            const tableContainer = document.getElementById('vendors-table-container');
+            const tbodyEl = document.getElementById('vendors-tbody');
+            
+            try {
+                const vendors = await window.getVendors();
+                
+                if (vendors.length === 0) {
+                    tbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No vendors found. Add one to get started.</td></tr>';
+                } else {
+                    tbodyEl.innerHTML = vendors.map(vendor => {
+                        const date = new Date(vendor.created_at).toLocaleDateString('en-IN');
+                        
+                        return `
+                            <tr>
+                                <td class="font-medium">${vendor.name}</td>
+                                <td>${vendor.gstin || '-'}</td>
+                                <td>${vendor.address || '-'}</td>
+                                <td>${vendor.contact_info || '-'}</td>
+                                <td>${date}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+                
+                loadingEl.classList.add('hidden');
+                errorEl.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+            } catch (error) {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                errorEl.textContent = `Error loading vendors: ${error.message}`;
+            }
+        }
+
+        function showAddModal() {
+            document.getElementById('add-modal').classList.remove('hidden');
+        }
+
+        function hideAddModal() {
+            document.getElementById('add-modal').classList.add('hidden');
+            document.getElementById('vendor-form').reset();
+            document.getElementById('vendor-message').innerHTML = '';
+        }
+
+        async function addVendor(event) {
+            event.preventDefault();
+            const messageEl = document.getElementById('vendor-message');
+            
+            const data = {
+                name: document.getElementById('vendor-name').value,
+                gstin: document.getElementById('vendor-gstin').value || null,
+                address: document.getElementById('vendor-address').value || null,
+                contact_info: document.getElementById('vendor-contact').value || null
+            };
+            
+            try {
+                await window.createVendor(data);
+                messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Vendor added successfully!</div>';
+                hideAddModal();
+                loadVendors();
+            } catch (error) {
+                messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadCompanyName() {
+            try {
+                const company = await window.getCurrentCompany();
+                document.getElementById('company-name-nav').textContent = company.name;
+            } catch (error) {
+                document.getElementById('company-name-nav').textContent = 'No company set';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCompanyName();
+            loadVendors();
+        });
+    </script>
+</body>
+</html>

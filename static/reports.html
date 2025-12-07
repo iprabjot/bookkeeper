@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Reports</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <i class="fas fa-book text-blue-600 mr-2"></i>Bookkeeper
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="index.html" class="nav-link">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="invoices.html" class="nav-link">
+                    <i class="fas fa-file-invoice w-5"></i>
+                    <span>Invoices</span>
+                </a>
+                <a href="bank-statements.html" class="nav-link">
+                    <i class="fas fa-university w-5"></i>
+                    <span>Bank Statements</span>
+                </a>
+                <a href="reports.html" class="nav-link active">
+                    <i class="fas fa-chart-bar w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="vendors.html" class="nav-link">
+                    <i class="fas fa-truck w-5"></i>
+                    <span>Vendors</span>
+                </a>
+                <a href="buyers.html" class="nav-link">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Buyers</span>
+                </a>
+                <a href="users.html" class="nav-link">
+                    <i class="fas fa-users-cog w-5"></i>
+                    <span>Users</span>
+                </a>
+                <a href="company.html" class="nav-link">
+                    <i class="fas fa-building w-5"></i>
+                    <span>Company</span>
+                </a>
+            </nav>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">Reports</h2>
+                        <p class="text-sm text-gray-500" id="company-name-nav">Loading...</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="showGenerateModal()" class="btn-primary">
+                            <i class="fas fa-sync-alt mr-2"></i>Generate Reports
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-6">
+                <div id="message" class="mb-4"></div>
+                
+                <!-- Bundle Selector -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Report Bundle</label>
+                            <select id="bundle-selector" onchange="loadSelectedBundle()" class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <div id="bundle-info" class="text-right hidden">
+                            <div class="text-sm text-gray-500 mb-1">
+                                <span id="bundle-date"></span>
+                            </div>
+                            <div class="text-sm text-gray-500 mb-2">
+                                <span id="bundle-user"></span>
+                            </div>
+                            <button onclick="deleteCurrentBundle()" class="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded transition-colors" title="Delete this bundle">
+                                <i class="fas fa-trash mr-1"></i>Delete
+                            </button>
+                        </div>
+                    </div>
+                    <div id="bundle-description" class="text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg hidden">
+                        <span class="font-medium">Description:</span> <span id="bundle-description-text"></span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Standard Reports</h3>
+                    
+                    <div id="reports-loading" class="flex items-center justify-center h-32">
+                        <div class="text-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            <p class="text-sm text-gray-500">Loading reports...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="reports-list" class="hidden space-y-4">
+                        <!-- Reports will be populated here -->
+                    </div>
+                    
+                    <div id="no-reports" class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+                        <p class="font-semibold">No reports found</p>
+                        <p class="text-sm mt-1">Click "Generate Reports" to create accounting reports.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Ledgers</h3>
+                    
+                    <div id="ledgers-loading" class="flex items-center justify-center h-32">
+                        <div class="text-center">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            <p class="text-sm text-gray-500">Loading ledgers...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="ledgers-list" class="hidden space-y-4">
+                        <!-- Ledgers will be populated here -->
+                    </div>
+                    
+                    <div id="no-ledgers" class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+                        <p class="font-semibold">No ledgers found</p>
+                        <p class="text-sm mt-1">Ledgers will appear here after processing invoices and generating reports.</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Generate Reports Modal -->
+    <div id="generate-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Generate Reports</h3>
+                <button onclick="closeGenerateModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <label for="report-description" class="block text-sm font-medium text-gray-700 mb-2">Bundle Name (Optional)</label>
+                <input type="text" id="report-description" placeholder="e.g., End of Month Reports, Q1 2025, Trial Run" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Give this report bundle a name to easily identify it later</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeGenerateModal()" class="btn-secondary">Cancel</button>
+                <button onclick="generateReportsLocal()" class="btn-primary">
+                    <i class="fas fa-sync-alt mr-2"></i>Generate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/api.js"></script>
+    <script>
+        let currentBundleId = null;
+        let bundles = [];
+        let isLoadingBundles = false;
+
+        function renderReportCard(report) {
+            return `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-file-csv text-blue-600 text-xl"></i>
+                        <div>
+                            <p class="font-medium text-gray-900">${report.name}</p>
+                            <p class="text-sm text-gray-500">${report.filename}</p>
+                        </div>
+                    </div>
+                    <a href="${API_BASE}${report.endpoint}" target="_blank" class="btn-primary">
+                        <i class="fas fa-download mr-2"></i>Download
+                    </a>
+                </div>
+            `;
+        }
+
+        async function loadBundles() {
+            // Prevent concurrent calls
+            if (isLoadingBundles) {
+                return;
+            }
+            isLoadingBundles = true;
+            
+            try {
+                const response = await window.listBundles();
+                bundles = response.bundles || [];
+                
+                const selector = document.getElementById('bundle-selector');
+                
+                // Store current value to avoid triggering change event unnecessarily
+                const previousValue = selector.value;
+                
+                selector.innerHTML = '';
+                
+                if (bundles.length === 0) {
+                    selector.innerHTML = '<option value="">No bundles available</option>';
+                    currentBundleId = null;
+                    return;
+                }
+                
+                bundles.forEach(bundle => {
+                    const option = document.createElement('option');
+                    option.value = bundle.bundle_id;
+                    const date = new Date(bundle.generated_at);
+                    const dateStr = date.toLocaleString();
+                    
+                    // Format: "Name - date (X reports)" or "date (X reports)" if no name
+                    if (bundle.description && bundle.description.trim()) {
+                        option.textContent = `${bundle.description} - ${dateStr} (${bundle.report_count} reports)`;
+                    } else {
+                        option.textContent = `${dateStr} (${bundle.report_count} reports)`;
+                    }
+                    selector.appendChild(option);
+                });
+                
+                // Select the latest bundle by default, but only if it's different
+                if (bundles.length > 0) {
+                    const newBundleId = bundles[0].bundle_id;
+                    const newValue = String(newBundleId);
+                    
+                    // Always load the latest bundle on initial load or if it changed
+                    if (previousValue === "" || previousValue !== newValue || currentBundleId !== newBundleId) {
+                        // Temporarily remove onchange to avoid triggering it when setting value programmatically
+                        selector.onchange = null;
+                        selector.value = newValue;
+                        selector.onchange = loadSelectedBundle;
+                        // Set currentBundleId AFTER setting selector value, but call loadSelectedBundle which will set it
+                        // This ensures loadSelectedBundle runs and loads the reports
+                        await loadSelectedBundle();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading bundles:', error);
+                document.getElementById('bundle-selector').innerHTML = '<option value="">Error loading bundles</option>';
+            } finally {
+                isLoadingBundles = false;
+            }
+        }
+
+        async function loadSelectedBundle() {
+            const selector = document.getElementById('bundle-selector');
+            const selectedBundleId = selector.value ? parseInt(selector.value) : null;
+            
+            // Don't reload if it's the same bundle (but allow initial load)
+            if (selectedBundleId === currentBundleId && currentBundleId !== null) {
+                return;
+            }
+            
+            currentBundleId = selectedBundleId;
+            
+            if (!currentBundleId) {
+                // Clear reports display
+                document.getElementById('reports-list').classList.add('hidden');
+                document.getElementById('ledgers-list').classList.add('hidden');
+                document.getElementById('no-reports').classList.remove('hidden');
+                document.getElementById('no-ledgers').classList.remove('hidden');
+                document.getElementById('bundle-info').classList.add('hidden');
+                return;
+            }
+            
+            // Load bundle details
+            try {
+                const bundle = await window.getBundle(currentBundleId);
+                const date = new Date(bundle.generated_at);
+                document.getElementById('bundle-date').textContent = `Generated: ${date.toLocaleString()}`;
+                document.getElementById('bundle-user').textContent = bundle.generated_by ? `By: ${bundle.generated_by}` : '';
+                document.getElementById('bundle-info').classList.remove('hidden');
+                
+                if (bundle.description) {
+                    document.getElementById('bundle-description-text').textContent = bundle.description;
+                    document.getElementById('bundle-description').classList.remove('hidden');
+                } else {
+                    document.getElementById('bundle-description').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading bundle details:', error);
+            }
+            
+            // Load reports for this bundle
+            await loadReports();
+        }
+
+        async function loadReports() {
+            const reportsLoadingEl = document.getElementById('reports-loading');
+            const reportsListEl = document.getElementById('reports-list');
+            const noReportsEl = document.getElementById('no-reports');
+            
+            const ledgersLoadingEl = document.getElementById('ledgers-loading');
+            const ledgersListEl = document.getElementById('ledgers-list');
+            const noLedgersEl = document.getElementById('no-ledgers');
+            
+            if (!currentBundleId) {
+                reportsLoadingEl.classList.add('hidden');
+                ledgersLoadingEl.classList.add('hidden');
+                noReportsEl.classList.remove('hidden');
+                noLedgersEl.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                console.log('Calling listReports for bundle:', currentBundleId);
+                const data = await window.listReports(currentBundleId);
+                console.log('Reports API response:', data);
+                
+                // Render standard reports
+                reportsLoadingEl.classList.add('hidden');
+                if (data.reports && data.reports.length > 0) {
+                    console.log('Found', data.reports.length, 'standard reports');
+                    noReportsEl.classList.add('hidden');
+                    reportsListEl.classList.remove('hidden');
+                    reportsListEl.innerHTML = data.reports.map(renderReportCard).join('');
+                } else {
+                    console.log('No standard reports found');
+                    noReportsEl.classList.remove('hidden');
+                    reportsListEl.classList.add('hidden');
+                }
+                
+                // Render ledgers
+                ledgersLoadingEl.classList.add('hidden');
+                if (data.ledgers && data.ledgers.length > 0) {
+                    console.log('Found', data.ledgers.length, 'ledgers');
+                    noLedgersEl.classList.add('hidden');
+                    ledgersListEl.classList.remove('hidden');
+                    ledgersListEl.innerHTML = data.ledgers.map(renderReportCard).join('');
+                } else {
+                    console.log('No ledgers found');
+                    noLedgersEl.classList.remove('hidden');
+                    ledgersListEl.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading reports:', error);
+                console.error('Error details:', error.message, error.stack);
+                reportsLoadingEl.classList.add('hidden');
+                ledgersLoadingEl.classList.add('hidden');
+                noReportsEl.classList.remove('hidden');
+                noLedgersEl.classList.remove('hidden');
+            }
+        }
+
+        function showGenerateModal() {
+            document.getElementById('generate-modal').classList.remove('hidden');
+            document.getElementById('report-description').value = '';
+        }
+
+        function closeGenerateModal() {
+            document.getElementById('generate-modal').classList.add('hidden');
+        }
+
+        async function generateReportsLocal() {
+            const messageEl = document.getElementById('message');
+            const description = document.getElementById('report-description').value.trim();
+            
+            closeGenerateModal();
+            messageEl.innerHTML = '<div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">Generating reports...</div>';
+            
+            try {
+                const result = await window.generateReports(description || undefined);
+                messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Reports generated successfully!</div>';
+                
+                // Wait a bit before reloading to avoid race conditions
+                setTimeout(async () => {
+                    messageEl.innerHTML = '';
+                    // Reset the loading flag and reload bundles
+                    isLoadingBundles = false;
+                    await loadBundles();
+                }, 1500);
+            } catch (error) {
+                messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
+            }
+        }
+
+        async function deleteCurrentBundle() {
+            if (!currentBundleId) return;
+            
+            if (!confirm('Are you sure you want to delete this report bundle? This action cannot be undone.')) {
+                return;
+            }
+            
+            const messageEl = document.getElementById('message');
+            messageEl.innerHTML = '<div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">Deleting bundle...</div>';
+            
+            try {
+                await window.deleteBundle(currentBundleId);
+                messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Bundle deleted successfully!</div>';
+                
+                // Wait a bit before reloading to avoid race conditions
+                setTimeout(async () => {
+                    messageEl.innerHTML = '';
+                    // Reset the loading flag and reload bundles
+                    isLoadingBundles = false;
+                    await loadBundles();
+                }, 1500);
+            } catch (error) {
+                messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadCompanyName() {
+            try {
+                const company = await window.getCurrentCompany();
+                document.getElementById('company-name-nav').textContent = company.name;
+            } catch (error) {
+                document.getElementById('company-name-nav').textContent = 'No company set';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCompanyName();
+            loadBundles();
+        });
+    </script>
+</body>
+</html>

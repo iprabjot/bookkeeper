@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Company</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <i class="fas fa-book text-blue-600 mr-2"></i>Bookkeeper
+                </h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="index.html" class="nav-link">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="invoices.html" class="nav-link">
+                    <i class="fas fa-file-invoice w-5"></i>
+                    <span>Invoices</span>
+                </a>
+                <a href="bank-statements.html" class="nav-link">
+                    <i class="fas fa-university w-5"></i>
+                    <span>Bank Statements</span>
+                </a>
+                <a href="reports.html" class="nav-link">
+                    <i class="fas fa-chart-bar w-5"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="vendors.html" class="nav-link">
+                    <i class="fas fa-truck w-5"></i>
+                    <span>Vendors</span>
+                </a>
+                <a href="buyers.html" class="nav-link">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Buyers</span>
+                </a>
+                <a href="users.html" class="nav-link">
+                    <i class="fas fa-user-shield w-5"></i>
+                    <span>Users</span>
+                </a>
+                <a href="company.html" class="nav-link active">
+                    <i class="fas fa-building w-5"></i>
+                    <span>Company</span>
+                </a>
+            </nav>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">Company Details</h2>
+                        <p class="text-sm text-gray-500" id="company-name-nav">Loading...</p>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-6">
+                <div id="loading" class="flex items-center justify-center h-64">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p class="text-gray-500">Loading company details...</p>
+                    </div>
+                </div>
+
+                <div id="error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
+
+                <div id="no-company" class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+                    <p class="font-semibold">No company set</p>
+                    <p class="text-sm mt-1">Please set up a company first using the setup script.</p>
+                </div>
+
+                <div id="company-form-container" class="hidden">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-6">Edit Company Information</h3>
+                        
+                        <form id="company-form" onsubmit="updateCompany(event)">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+                                    <input type="text" id="company-name" class="form-input" required>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">GSTIN</label>
+                                    <input type="text" id="company-gstin" class="form-input" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 flex gap-3">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fas fa-save mr-2"></i>Save Changes
+                                </button>
+                                <button type="button" onclick="loadCompany()" class="btn-secondary">
+                                    <i class="fas fa-times mr-2"></i>Cancel
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div id="message" class="mt-4"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="/static/api.js"></script>
+    <script>
+        async function loadCompany() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const noCompanyEl = document.getElementById('no-company');
+            const formEl = document.getElementById('company-form-container');
+            
+            try {
+                const company = await window.getCurrentCompany();
+                
+                document.getElementById('company-name').value = company.name;
+                document.getElementById('company-gstin').value = company.gstin;
+                document.getElementById('company-name-nav').textContent = company.name;
+                
+                loadingEl.classList.add('hidden');
+                errorEl.classList.add('hidden');
+                noCompanyEl.classList.add('hidden');
+                formEl.classList.remove('hidden');
+            } catch (error) {
+                if (error.message.includes('404') || error.message.includes('No current company')) {
+                    loadingEl.classList.add('hidden');
+                    errorEl.classList.add('hidden');
+                    noCompanyEl.classList.remove('hidden');
+                    formEl.classList.add('hidden');
+                } else {
+                    loadingEl.classList.add('hidden');
+                    errorEl.classList.remove('hidden');
+                    errorEl.textContent = `Error: ${error.message}`;
+                }
+            }
+        }
+        
+        async function updateCompany(event) {
+            event.preventDefault();
+            const messageEl = document.getElementById('message');
+            
+            const data = {
+                name: document.getElementById('company-name').value,
+                gstin: document.getElementById('company-gstin').value
+            };
+            
+            try {
+                const updated = await window.updateCompany(data);
+                messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Company updated successfully!</div>';
+                document.getElementById('company-name-nav').textContent = updated.name;
+                
+                setTimeout(() => {
+                    messageEl.innerHTML = '';
+                }, 3000);
+            } catch (error) {
+                messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadCompany);
+    </script>
+</body>
+</html>

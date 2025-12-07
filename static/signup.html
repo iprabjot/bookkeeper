@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Sign Up</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen flex items-center justify-center py-8">
+    <div class="max-w-2xl w-full mx-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                    <i class="fas fa-book text-blue-600 mr-2"></i>Bookkeeper
+                </h1>
+                <p class="text-gray-600">Create your company account</p>
+            </div>
+
+            <div id="message" class="mb-4"></div>
+
+            <form id="signup-form" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="md:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label for="company_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-building mr-2 text-blue-600"></i>Company Name *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="company_name" 
+                            name="company_name" 
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="Your Company Name"
+                        >
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="gstin" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-id-card mr-2 text-blue-600"></i>GSTIN *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="gstin" 
+                            name="gstin" 
+                            required
+                            maxlength="15"
+                            pattern="[0-9A-Z]{15}"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition uppercase"
+                            placeholder="12ABCDE1234F1Z5"
+                        >
+                        <p class="text-xs text-gray-500 mt-1">15-character GSTIN (alphanumeric)</p>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 mt-4">Owner Account</h3>
+                    </div>
+
+                    <div>
+                        <label for="owner_name" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user mr-2 text-blue-600"></i>Your Name *
+                        </label>
+                        <input 
+                            type="text" 
+                            id="owner_name" 
+                            name="owner_name" 
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="John Doe"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="owner_email" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-envelope mr-2 text-blue-600"></i>Email *
+                        </label>
+                        <input 
+                            type="email" 
+                            id="owner_email" 
+                            name="owner_email" 
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="your@email.com"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="owner_password" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lock mr-2 text-blue-600"></i>Password *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="owner_password" 
+                            name="owner_password" 
+                            required
+                            minlength="8"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="Minimum 8 characters"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lock mr-2 text-blue-600"></i>Confirm Password *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="confirm_password" 
+                            name="confirm_password" 
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            placeholder="Re-enter password"
+                        >
+                    </div>
+                </div>
+
+                <button 
+                    type="submit" 
+                    class="w-full btn-primary py-3 text-lg"
+                    id="signup-btn"
+                >
+                    <i class="fas fa-user-plus mr-2"></i>Create Account
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <p class="text-sm text-gray-600">
+                    Already have an account? 
+                    <a href="login.html" class="text-blue-600 hover:text-blue-800 font-medium">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/api.js"></script>
+    <script>
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const password = document.getElementById('owner_password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (password !== confirmPassword) {
+                document.getElementById('message').innerHTML = `
+                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        <i class="fas fa-exclamation-circle mr-2"></i>Passwords do not match
+                    </div>
+                `;
+                return;
+            }
+            
+            const formData = {
+                company_name: document.getElementById('company_name').value,
+                gstin: document.getElementById('gstin').value.toUpperCase(),
+                owner_name: document.getElementById('owner_name').value,
+                owner_email: document.getElementById('owner_email').value,
+                owner_password: password
+            };
+            
+            const messageEl = document.getElementById('message');
+            const signupBtn = document.getElementById('signup-btn');
+            
+            messageEl.innerHTML = '';
+            signupBtn.disabled = true;
+            signupBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating account...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Signup failed');
+                }
+                
+                messageEl.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                        <i class="fas fa-check-circle mr-2"></i>Account created successfully! Redirecting to login...
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+            } catch (error) {
+                messageEl.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        <i class="fas fa-exclamation-circle mr-2"></i>${error.message}
+                    </div>
+                `;
+                signupBtn.disabled = false;
+                signupBtn.innerHTML = '<i class="fas fa-user-plus mr-2"></i>Create Account';
+            }
+        });
+    </script>
+</body>
+</html>
+
