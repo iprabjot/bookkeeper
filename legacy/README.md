@@ -14,3 +14,4 @@ These tools use the old disk-based report generation system. The production Fast
 
 If you need CLI functionality, consider creating new tools that use the FastAPI endpoints or the database-backed report system.
 
+
