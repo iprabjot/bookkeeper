@@ -22,9 +22,9 @@ class BuyerCreate(BaseModel):
 @router.get("/buyers", response_model=List[BuyerResponse])
 async def list_buyers(current_user: User = Depends(get_current_user)):
     """List all buyers for the authenticated user's company"""
-    buyers = VendorBuyerManager.list_buyers()
-    # Filter by company_id
-    return [b for b in buyers if b.company_id == current_user.company_id]
+    # Pass company_id directly to ensure proper filtering
+    buyers = VendorBuyerManager.list_buyers(company_id=current_user.company_id)
+    return buyers
 
 
 @router.post("/buyers", response_model=BuyerResponse)

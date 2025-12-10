@@ -22,9 +22,9 @@ class VendorCreate(BaseModel):
 @router.get("/vendors", response_model=List[VendorResponse])
 async def list_vendors(current_user: User = Depends(get_current_user)):
     """List all vendors for the authenticated user's company"""
-    vendors = VendorBuyerManager.list_vendors()
-    # Filter by company_id
-    return [v for v in vendors if v.company_id == current_user.company_id]
+    # Pass company_id directly to ensure proper filtering
+    vendors = VendorBuyerManager.list_vendors(company_id=current_user.company_id)
+    return vendors
 
 
 @router.post("/vendors", response_model=VendorResponse)
