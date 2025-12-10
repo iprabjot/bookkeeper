@@ -1,7 +1,7 @@
 """
 User management routes: create, list, update users
 """
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from api.schemas import UserResponse, CreateUserRequest, UpdateUserRequest
@@ -24,6 +24,7 @@ def generate_temp_password(length: int = 12) -> str:
 @router.post("/users", response_model=UserResponse)
 async def create_user(
     request: CreateUserRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_owner_or_admin),
     db: Session = Depends(get_db)
 ):

@@ -1,7 +1,7 @@
 """
 Authentication routes: signup, login, token refresh
 """
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -30,7 +30,11 @@ def generate_temp_password(length: int = 12) -> str:
 
 
 @router.post("/signup", response_model=dict)
-async def signup(request: SignupRequest, db: Session = Depends(get_db)):
+async def signup(
+    request: SignupRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Sign up a new company and create owner user
     """
@@ -72,16 +76,23 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
         
-        # Send welcome email
-        try:
-            await send_welcome_email(
-                to_email=user.email,
-                name=user.name,
-                company_name=company.name,
-                password=request.owner_password
-            )
-        except Exception as e:
-            print(f"Warning: Failed to send welcome email: {e}")
+        # Send welcome email in background (non-blocking)
+        async def send_email_background():
+            """Background task to send email without blocking response"""
+            try:
+                await send_welcome_email(
+                    to_email=user.email,
+                    name=user.name,
+                    company_name=company.name,
+                    password=request.owner_password
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Background email task failed: {e}", exc_info=True)
+        
+        # Schedule email to be sent in background
+        background_tasks.add_task(send_email_background)
         
         return {
             "message": "Company and user created successfully",

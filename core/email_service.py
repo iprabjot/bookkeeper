@@ -6,10 +6,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Template
 import os
+import logging
 from dotenv import load_dotenv
 from typing import Optional
 
 load_dotenv()
+
+# Set up logger for email service
+logger = logging.getLogger(__name__)
 
 # SMTP Configuration
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -39,7 +43,7 @@ async def send_email(
         True if sent successfully, False otherwise
     """
     if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"Warning: Email not configured. Would send to {to_email}: {subject}")
+        logger.warning(f"Email not configured. Would send to {to_email}: {subject}")
         return False
     
     try:
@@ -55,12 +59,16 @@ async def send_email(
         # Use SMTP class directly for better control over STARTTLS
         # Port 587: Use STARTTLS (upgrade plain connection to TLS)
         # Port 465: Use SSL/TLS directly
+        # Add timeout to prevent hanging (10 seconds)
+        timeout = 10
+        
         if SMTP_PORT == 465:
             # Port 465 requires immediate SSL/TLS connection
             smtp = aiosmtplib.SMTP(
                 hostname=SMTP_HOST,
                 port=SMTP_PORT,
-                use_tls=True  # Direct TLS for port 465
+                use_tls=True,  # Direct TLS for port 465
+                timeout=timeout
             )
         else:
             # Port 587 (or other ports) use STARTTLS
@@ -68,10 +76,11 @@ async def send_email(
                 hostname=SMTP_HOST,
                 port=SMTP_PORT,
                 use_tls=False,  # Start with plain connection
-                start_tls=True  # Automatically upgrade to TLS after connect
+                start_tls=True,  # Automatically upgrade to TLS after connect
+                timeout=timeout
             )
         
-        await smtp.connect()
+        await smtp.connect(timeout=timeout)
         
         # Note: If start_tls=True is set in constructor, it's handled automatically
         # Only call starttls() manually if start_tls was not set
@@ -81,10 +90,10 @@ async def send_email(
         await smtp.send_message(message)
         await smtp.quit()
         
-        print(f"Email sent to {to_email}: {subject}")
+        logger.info(f"Email sent successfully to {to_email}: {subject}")
         return True
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        logger.error(f"Failed to send email to {to_email}: {type(e).__name__}: {str(e)}", exc_info=True)
         return False
 
 
