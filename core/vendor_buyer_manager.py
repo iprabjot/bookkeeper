@@ -203,4 +203,66 @@ class VendorBuyerManager:
                     company_id: Optional[int] = None) -> Buyer:
         """Create a new buyer (use get_or_create_buyer to avoid duplicates)"""
         return VendorBuyerManager.get_or_create_buyer(name, gstin, address, contact_info, company_id)
+    
+    @staticmethod
+    def update_vendor(vendor_id: int, name: Optional[str] = None, gstin: Optional[str] = None,
+                     address: Optional[str] = None, contact_info: Optional[str] = None,
+                     company_id: Optional[int] = None) -> Vendor:
+        """Update vendor details"""
+        db = next(get_db())
+        try:
+            vendor = db.query(Vendor).filter(Vendor.vendor_id == vendor_id).first()
+            if not vendor:
+                raise ValueError(f"Vendor with ID {vendor_id} not found")
+            
+            # Verify company_id matches if provided
+            if company_id and vendor.company_id != company_id:
+                raise ValueError("Vendor belongs to different company")
+            
+            # Update fields if provided
+            if name is not None:
+                vendor.name = name.strip()
+            if gstin is not None:
+                vendor.gstin = gstin.strip() if gstin else None
+            if address is not None:
+                vendor.address = address.strip() if address else None
+            if contact_info is not None:
+                vendor.contact_info = contact_info.strip() if contact_info else None
+            
+            db.commit()
+            db.refresh(vendor)
+            return vendor
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_buyer(buyer_id: int, name: Optional[str] = None, gstin: Optional[str] = None,
+                    address: Optional[str] = None, contact_info: Optional[str] = None,
+                    company_id: Optional[int] = None) -> Buyer:
+        """Update buyer details"""
+        db = next(get_db())
+        try:
+            buyer = db.query(Buyer).filter(Buyer.buyer_id == buyer_id).first()
+            if not buyer:
+                raise ValueError(f"Buyer with ID {buyer_id} not found")
+            
+            # Verify company_id matches if provided
+            if company_id and buyer.company_id != company_id:
+                raise ValueError("Buyer belongs to different company")
+            
+            # Update fields if provided
+            if name is not None:
+                buyer.name = name.strip()
+            if gstin is not None:
+                buyer.gstin = gstin.strip() if gstin else None
+            if address is not None:
+                buyer.address = address.strip() if address else None
+            if contact_info is not None:
+                buyer.contact_info = contact_info.strip() if contact_info else None
+            
+            db.commit()
+            db.refresh(buyer)
+            return buyer
+        finally:
+            db.close()
 

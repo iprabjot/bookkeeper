@@ -56,6 +56,34 @@ def process_invoice(invoice_data: Dict, file_path: str, company_id: int = None) 
             if not current_company:
                 raise ValueError(f"Company with ID {company_id} not found")
         
+        # Validate that current company is mentioned in invoice
+        vendor_name = (invoice_data.get("vendor_name") or "").upper().strip()
+        vendor_gstin = (invoice_data.get("vendor_gstin") or "").strip()
+        customer_name = (invoice_data.get("customer_name") or "").upper().strip()
+        customer_gstin = (invoice_data.get("customer_gstin") or "").strip()
+        
+        current_company_name = current_company.name.upper().strip()
+        current_company_gstin = current_company.gstin.strip() if current_company.gstin else ""
+        
+        # Check if current company is mentioned anywhere
+        company_mentioned = False
+        if current_company_gstin:
+            if vendor_gstin == current_company_gstin or customer_gstin == current_company_gstin:
+                company_mentioned = True
+        
+        if not company_mentioned:
+            # Check name matches
+            if (vendor_name and (current_company_name in vendor_name or vendor_name in current_company_name)) or \
+               (customer_name and (current_company_name in customer_name or customer_name in current_company_name)):
+                company_mentioned = True
+        
+        if not company_mentioned:
+            raise ValueError(
+                f"This invoice does not appear to belong to your company ({current_company.name}). "
+                f"The invoice must mention your company name or GSTIN as either the vendor or buyer. "
+                f"Please verify the invoice is correct."
+            )
+        
         # Classify invoice
         classification = classify_invoice(invoice_data, company_id=company_id)
         invoice_type_str = classification["type"]
@@ -67,33 +95,51 @@ def process_invoice(invoice_data: Dict, file_path: str, company_id: int = None) 
         
         if invoice_type == InvoiceType.PURCHASE:
             # Purchase invoice: vendor is the supplier
-            vendor_name = invoice_data.get("vendor_name") or ""
+            vendor_name_orig = invoice_data.get("vendor_name") or ""
             vendor_gstin = invoice_data.get("vendor_gstin")
+            vendor_address = invoice_data.get("vendor_address")
+            vendor_contact = invoice_data.get("vendor_contact")
             
-            if not vendor_name.strip():
+            if not vendor_name_orig.strip():
                 raise ValueError("Vendor name is required for purchase invoices but could not be extracted from PDF")
             
+            # Validate buyer in purchase invoice - should be current company or blank
+            customer_name_orig = invoice_data.get("customer_name") or ""
+            if customer_name_orig.strip():
+                customer_name_upper = customer_name_orig.upper().strip()
+                # Check if customer name matches current company
+                if not (current_company_name in customer_name_upper or customer_name_upper in current_company_name):
+                    # If GSTIN matches, it's OK
+                    customer_gstin_check = invoice_data.get("customer_gstin") or ""
+                    if customer_gstin_check != current_company_gstin:
+                        raise ValueError(
+                            f"Purchase invoice buyer should be your company ({current_company.name}) or blank. "
+                            f"Found buyer: {customer_name_orig}. Please verify this is a purchase invoice."
+                        )
+            
             vendor = VendorBuyerManager.get_or_create_vendor(
-                name=vendor_name.strip(),
+                name=vendor_name_orig.strip(),
                 gstin=vendor_gstin.strip() if vendor_gstin else None,
-                address=None,
-                contact_info=None,
+                address=vendor_address.strip() if vendor_address else None,
+                contact_info=vendor_contact.strip() if vendor_contact else None,
                 company_id=company_id
             )
             vendor_id = vendor.vendor_id
         else:
             # Sales invoice: buyer is the customer
-            customer_name = invoice_data.get("customer_name") or ""
+            customer_name_orig = invoice_data.get("customer_name") or ""
             customer_gstin = invoice_data.get("customer_gstin")
+            customer_address = invoice_data.get("customer_address")
+            customer_contact = invoice_data.get("customer_contact")
             
-            if not customer_name.strip():
+            if not customer_name_orig.strip():
                 raise ValueError("Customer name is required for sales invoices but could not be extracted from PDF")
             
             buyer = VendorBuyerManager.get_or_create_buyer(
-                name=customer_name.strip(),
+                name=customer_name_orig.strip(),
                 gstin=customer_gstin.strip() if customer_gstin else None,
-                address=None,
-                contact_info=None,
+                address=customer_address.strip() if customer_address else None,
+                contact_info=customer_contact.strip() if customer_contact else None,
                 company_id=company_id
             )
             buyer_id = buyer.buyer_id

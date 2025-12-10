@@ -250,12 +250,16 @@ def parse_gst_details(text):
 
 
 def parse_vendor_customer(text):
-    """Extract vendor and customer information."""
+    """Extract vendor and customer information including addresses and contact details."""
     info = {
         "vendor_name": None,
         "vendor_gstin": None,
+        "vendor_address": None,
+        "vendor_contact": None,
         "customer_name": None,
         "customer_gstin": None,
+        "customer_address": None,
+        "customer_contact": None,
     }
     
     # Extract vendor name - look for company name at the start of document (header section)
@@ -400,6 +404,73 @@ def parse_vendor_customer(text):
     if len(gstin_matches) >= 2:
         info["customer_gstin"] = gstin_matches[1]
     
+    # Extract vendor address and contact
+    if info["vendor_name"]:
+        vendor_section = header_text
+        # Look for address patterns after vendor name
+        address_patterns = [
+            r'(?:Address|ADDRESS)[:\s]*([^\n]{10,200})',
+            r'(?:Add[:\s]*|Addr[:\s]*)([^\n]{10,200})',
+        ]
+        for pattern in address_patterns:
+            addr_match = re.search(pattern, vendor_section, re.IGNORECASE)
+            if addr_match:
+                address = addr_match.group(1).strip()
+                # Clean up address
+                address = re.sub(r'\s+', ' ', address)
+                address = address.split('\n')[0].strip()
+                if len(address) > 10:
+                    info["vendor_address"] = address
+                    break
+        
+        # Extract contact info (phone, email)
+        contact_patterns = [
+            r'(?:Phone|Mobile|Mob|Tel)[:\s]*([+\d\s\-]{8,20})',
+            r'(?:Email|E-mail|Mail)[:\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+        ]
+        contact_parts = []
+        for pattern in contact_patterns:
+            contact_match = re.search(pattern, vendor_section, re.IGNORECASE)
+            if contact_match:
+                contact_parts.append(contact_match.group(1).strip())
+        if contact_parts:
+            info["vendor_contact"] = ", ".join(contact_parts)
+    
+    # Extract customer address and contact
+    if info["customer_name"]:
+        # Find customer section (after "Bill To" or "Billed To")
+        customer_section_start = re.search(r'(?:Bill\s+To|Billed\s+To|Buyer)', text, re.IGNORECASE)
+        if customer_section_start:
+            customer_section = text[customer_section_start.end():customer_section_start.end()+500]
+            
+            # Look for address patterns
+            address_patterns = [
+                r'(?:Address|ADDRESS)[:\s]*([^\n]{10,200})',
+                r'(?:Add[:\s]*|Addr[:\s]*)([^\n]{10,200})',
+            ]
+            for pattern in address_patterns:
+                addr_match = re.search(pattern, customer_section, re.IGNORECASE)
+                if addr_match:
+                    address = addr_match.group(1).strip()
+                    address = re.sub(r'\s+', ' ', address)
+                    address = address.split('\n')[0].strip()
+                    if len(address) > 10:
+                        info["customer_address"] = address
+                        break
+            
+            # Extract contact info
+            contact_patterns = [
+                r'(?:Phone|Mobile|Mob|Tel)[:\s]*([+\d\s\-]{8,20})',
+                r'(?:Email|E-mail|Mail)[:\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            ]
+            contact_parts = []
+            for pattern in contact_patterns:
+                contact_match = re.search(pattern, customer_section, re.IGNORECASE)
+                if contact_match:
+                    contact_parts.append(contact_match.group(1).strip())
+            if contact_parts:
+                info["customer_contact"] = ", ".join(contact_parts)
+    
     return info
 
 
@@ -436,8 +507,12 @@ Return a JSON object with these exact fields:
     "sgst": number or null,
     "vendor_name": "company name issuing the invoice or null",
     "vendor_gstin": "15-character GSTIN or null",
+    "vendor_address": "full address of vendor (street, city, state, pincode) or null",
+    "vendor_contact": "contact details (phone, email) of vendor or null",
     "customer_name": "company name receiving the invoice (buyer/billed to) or null",
-    "customer_gstin": "15-character GSTIN or null"
+    "customer_gstin": "15-character GSTIN or null",
+    "customer_address": "full address of customer (street, city, state, pincode) or null",
+    "customer_contact": "contact details (phone, email) of customer or null"
 }}
 
 Rules:
@@ -447,6 +522,8 @@ Rules:
 - Vendor is the company issuing the invoice (usually at top/header)
 - Customer is the company receiving the invoice (usually "Bill To" or "Billed To" section)
 - GSTINs are exactly 15 characters (alphanumeric)
+- Extract full addresses including street, city, state, and pincode
+- Extract contact information including phone numbers and email addresses
 - Return null for missing fields, not empty strings
 - Return ONLY the JSON object, no other text
 
