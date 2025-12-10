@@ -256,6 +256,26 @@ async function uploadInvoice(file) {
     });
 }
 
+async function uploadMultipleInvoices(files) {
+    const formData = new FormData();
+    files.forEach(file => {
+        formData.append('files', file);
+    });
+    
+    return apiRequest('/invoices/upload-multiple', {
+        method: 'POST',
+        body: formData
+    });
+}
+
+async function getUploadStatus(uploadId) {
+    return await apiRequest(`/invoices/uploads/${uploadId}`);
+}
+
+async function listUploads() {
+    return await apiRequest('/invoices/uploads');
+}
+
 async function getBankTransactions() {
     return apiRequest('/bank-transactions');
 }
@@ -435,6 +455,9 @@ window.createCompany = createCompany;
 window.updateCompany = updateCompany;
 window.getInvoices = getInvoices;
 window.uploadInvoice = uploadInvoice;
+window.uploadMultipleInvoices = uploadMultipleInvoices;
+window.getUploadStatus = getUploadStatus;
+window.listUploads = listUploads;
 window.getBankTransactions = getBankTransactions;
 window.uploadBankStatement = uploadBankStatement;
 window.runReconciliation = runReconciliation;
