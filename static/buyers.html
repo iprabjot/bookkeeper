@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- AG Grid Community Edition -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
@@ -39,21 +43,7 @@
                     
                     <div id="buyers-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                     
-                    <div class="table-container hidden" id="buyers-table-container">
-                        <table id="buyers-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>GSTIN</th>
-                                    <th>Address</th>
-                                    <th>Contact</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="buyers-tbody"></tbody>
-                        </table>
-                    </div>
+                    <div id="buyers-grid-container" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
                 </div>
             </main>
         </div>
@@ -69,7 +59,7 @@
                 </button>
             </div>
             
-            <form id="edit-buyer-form" onsubmit="updateBuyer(event)">
+            <form id="edit-buyer-form" onsubmit="updateBuyerForm(event)">
                 <input type="hidden" id="edit-buyer-id">
                 <div class="space-y-4">
                     <div>
@@ -157,43 +147,124 @@
 
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
+    <script src="/static/ag-grid-helper.js"></script>
     <script>
+        let buyersGridApi = null;
+
         async function loadBuyers() {
             const loadingEl = document.getElementById('buyers-loading');
             const errorEl = document.getElementById('buyers-error');
-            const tableContainer = document.getElementById('buyers-table-container');
-            const tbodyEl = document.getElementById('buyers-tbody');
+            const gridContainer = document.getElementById('buyers-grid-container');
+            
+            loadingEl.classList.remove('hidden');
+            errorEl.classList.add('hidden');
+            gridContainer.classList.add('hidden');
             
             try {
                 const buyers = await window.getBuyers();
                 
-                if (buyers.length === 0) {
-                    tbodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No buyers found. Add one to get started.</td></tr>';
+                // Define column definitions with editable cells
+                const columnDefs = [
+                    { 
+                        field: 'name', 
+                        headerName: 'Name',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor'
+                    },
+                    { 
+                        field: 'gstin', 
+                        headerName: 'GSTIN',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor',
+                        cellRenderer: (params) => {
+                            return params.value || '-';
+                        }
+                    },
+                    { 
+                        field: 'address', 
+                        headerName: 'Address',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 2,
+                        cellEditor: 'agLargeTextCellEditor',
+                        cellEditorParams: {
+                            maxLength: 500,
+                            rows: 3,
+                            cols: 50
+                        },
+                        cellRenderer: (params) => {
+                            return params.value || '-';
+                        }
+                    },
+                    { 
+                        field: 'contact_info', 
+                        headerName: 'Contact',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor',
+                        cellRenderer: (params) => {
+                            return params.value || '-';
+                        }
+                    },
+                    { 
+                        field: 'created_at', 
+                        headerName: 'Created',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        editable: false,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '-';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    }
+                ];
+
+                // Initialize or update grid
+                if (!buyersGridApi) {
+                    buyersGridApi = window.agGridHelper.initAGGrid('buyers-grid-container', columnDefs, buyers, {
+                        pagination: true,
+                        paginationPageSize: 25,
+                        onCellValueChanged: async (params) => {
+                            // Save changes when cell is edited
+                            if (params.oldValue === params.newValue) return;
+                            
+                            try {
+                                const buyerId = params.data.buyer_id;
+                                const updateData = {
+                                    [params.colDef.field]: params.newValue || null
+                                };
+                                
+                                await window.updateBuyer(buyerId, updateData);
+                                
+                                // Show success indicator
+                                params.node.setDataValue(params.colDef.field, params.newValue);
+                            } catch (error) {
+                                // Revert on error
+                                params.node.setDataValue(params.colDef.field, params.oldValue);
+                                alert(`Error updating ${params.colDef.headerName}: ${error.message}`);
+                            }
+                        }
+                    });
                 } else {
-                    tbodyEl.innerHTML = buyers.map(buyer => {
-                        const date = new Date(buyer.created_at).toLocaleDateString('en-IN');
-                        
-                        return `
-                            <tr>
-                                <td class="font-medium">${buyer.name}</td>
-                                <td>${buyer.gstin || '-'}</td>
-                                <td>${buyer.address || '-'}</td>
-                                <td>${buyer.contact_info || '-'}</td>
-                                <td>${date}</td>
-                                <td>
-                                    <button onclick="showEditModal(${buyer.buyer_id}, '${buyer.name.replace(/'/g, "\\'")}', '${(buyer.gstin || '').replace(/'/g, "\\'")}', '${(buyer.address || '').replace(/'/g, "\\'")}', '${(buyer.contact_info || '').replace(/'/g, "\\'")}')" 
-                                            class="text-blue-600 hover:text-blue-800" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('');
+                    window.agGridHelper.updateGridData(buyersGridApi, buyers);
                 }
                 
                 loadingEl.classList.add('hidden');
                 errorEl.classList.add('hidden');
-                tableContainer.classList.remove('hidden');
+                gridContainer.classList.remove('hidden');
             } catch (error) {
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
@@ -247,7 +318,7 @@
             document.getElementById('edit-buyer-message').innerHTML = '';
         }
 
-        async function updateBuyer(event) {
+        async function updateBuyerForm(event) {
             event.preventDefault();
             const messageEl = document.getElementById('edit-buyer-message');
             const buyerId = document.getElementById('edit-buyer-id').value;

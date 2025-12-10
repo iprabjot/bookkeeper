@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- AG Grid Community Edition -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
@@ -37,22 +41,7 @@
                     
                     <div id="users-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                     
-                    <div class="table-container hidden" id="users-table-container">
-                        <table id="users-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Status</th>
-                                    <th>Email Verified</th>
-                                    <th>Last Login</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-tbody"></tbody>
-                        </table>
-                    </div>
+                    <div id="users-grid-container" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
                 </div>
             </main>
         </div>
@@ -151,19 +140,20 @@
 
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
+    <script src="/static/ag-grid-helper.js"></script>
     <script>
         let currentUser = null;
         let users = [];
+        let usersGridApi = null;
 
         async function loadUsers() {
             const loadingEl = document.getElementById('users-loading');
             const errorEl = document.getElementById('users-error');
-            const tableContainer = document.getElementById('users-table-container');
-            const tbody = document.getElementById('users-tbody');
+            const gridContainer = document.getElementById('users-grid-container');
 
             loadingEl.classList.remove('hidden');
             errorEl.classList.add('hidden');
-            tableContainer.classList.add('hidden');
+            gridContainer.classList.add('hidden');
 
             try {
                 // Get current user to check role
@@ -180,49 +170,131 @@
 
                 users = await window.getUsers();
                 
-                if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-8">No users found</td></tr>';
+                // Define column definitions for AG Grid with editable cells
+                const columnDefs = [
+                    { 
+                        field: 'name', 
+                        headerName: 'Name',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor'
+                    },
+                    { 
+                        field: 'email', 
+                        headerName: 'Email',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: false, // Email cannot be changed
+                        flex: 1
+                    },
+                    { 
+                        field: 'role', 
+                        headerName: 'Role',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        cellEditor: 'agSelectCellEditor',
+                        cellEditorParams: {
+                            values: ['owner', 'admin', 'accountant', 'viewer']
+                        },
+                        cellRenderer: (params) => {
+                            const role = params.value || '';
+                            const roleUpper = role.toUpperCase();
+                            const roleColors = {
+                                'owner': 'bg-purple-50 text-purple-700 border border-purple-200',
+                                'admin': 'bg-blue-50 text-blue-700 border border-blue-200',
+                                'accountant': 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                                'viewer': 'bg-gray-50 text-gray-700 border border-gray-200'
+                            };
+                            const badgeClass = roleColors[role.toLowerCase()] || 'bg-gray-50 text-gray-700 border border-gray-200';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}">${escapeHtml(roleUpper)}</span>`;
+                        }
+                    },
+                    { 
+                        field: 'is_active', 
+                        headerName: 'Status',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        cellEditor: 'agSelectCellEditor',
+                        cellEditorParams: {
+                            values: [true, false]
+                        },
+                        cellRenderer: (params) => {
+                            const isActive = params.value;
+                            const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
+                            const badgeClass = isActive 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                : 'bg-red-50 text-red-700 border border-red-200';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}">${statusText}</span>`;
+                        }
+                    },
+                    { 
+                        field: 'email_verified', 
+                        headerName: 'Email Verified',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: false,
+                        cellRenderer: (params) => {
+                            const verified = params.value;
+                            if (verified) {
+                                return '<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fas fa-check mr-1"></i>VERIFIED</span>';
+                            } else {
+                                return '<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200"><i class="fas fa-times mr-1"></i>NOT VERIFIED</span>';
+                            }
+                        }
+                    },
+                    { 
+                        field: 'last_login', 
+                        headerName: 'Last Login',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        editable: false,
+                        cellRenderer: (params) => {
+                            if (!params.value) return 'Never';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    }
+                ];
+
+                // Initialize or update grid with editable cells
+                if (!usersGridApi) {
+                    usersGridApi = window.agGridHelper.initAGGrid('users-grid-container', columnDefs, users, {
+                        pagination: true,
+                        paginationPageSize: 25,
+                        onCellValueChanged: async (params) => {
+                            // Save changes when cell is edited
+                            if (params.oldValue === params.newValue) return;
+                            
+                            try {
+                                const userId = params.data.user_id;
+                                const updateData = {
+                                    [params.colDef.field]: params.newValue
+                                };
+                                
+                                await window.updateUser(userId, updateData);
+                                
+                                // Show success indicator
+                                params.node.setDataValue(params.colDef.field, params.newValue);
+                            } catch (error) {
+                                // Revert on error
+                                params.node.setDataValue(params.colDef.field, params.oldValue);
+                                alert(`Error updating ${params.colDef.headerName}: ${error.message}`);
+                            }
+                        }
+                    });
                 } else {
-                    tbody.innerHTML = users.map(user => `
-                        <tr>
-                            <td>${escapeHtml(user.name)}</td>
-                            <td>${escapeHtml(user.email)}</td>
-                            <td><span class="badge badge-${getRoleColor(user.role)}">${user.role}</span></td>
-                            <td>
-                                <span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">
-                                    ${user.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                            </td>
-                            <td>
-                                ${user.email_verified 
-                                    ? '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Verified</span>'
-                                    : '<span class="badge badge-warning"><i class="fas fa-times mr-1"></i>Not Verified</span>'
-                                }
-                            </td>
-                            <td>${user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</td>
-                            <td>
-                                <div class="flex space-x-2">
-                                    <button onclick="editUser(${user.user_id})" class="btn-icon" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    ${!user.email_verified ? `
-                                        <button onclick="sendVerificationEmailForUser(${user.user_id})" class="btn-icon text-blue-600" title="Send Verification Email">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                    ` : ''}
-                                    ${user.user_id !== currentUser.user_id ? `
-                                        <button onclick="deleteUserConfirm(${user.user_id})" class="btn-icon text-red-600" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('');
+                    window.agGridHelper.updateGridData(usersGridApi, users);
                 }
 
                 loadingEl.classList.add('hidden');
-                tableContainer.classList.remove('hidden');
+                gridContainer.classList.remove('hidden');
             } catch (error) {
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
@@ -285,6 +357,16 @@
             try {
                 await window.sendVerificationEmail();
                 alert('Verification email sent! Please check your inbox.');
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function sendVerificationEmailForUser(userId) {
+            try {
+                // This would need to be implemented in the API
+                // For now, just show a message
+                alert('Verification email functionality needs to be implemented in the API');
             } catch (error) {
                 alert(`Error: ${error.message}`);
             }

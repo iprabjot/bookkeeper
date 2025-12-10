@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- AG Grid Community Edition -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
@@ -39,21 +43,7 @@
                     
                     <div id="vendors-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                     
-                    <div class="table-container hidden" id="vendors-table-container">
-                        <table id="vendors-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>GSTIN</th>
-                                    <th>Address</th>
-                                    <th>Contact</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="vendors-tbody"></tbody>
-                        </table>
-                    </div>
+                    <div id="vendors-grid-container" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
                 </div>
             </main>
         </div>
@@ -69,7 +59,7 @@
                 </button>
             </div>
             
-            <form id="edit-vendor-form" onsubmit="updateVendor(event)">
+            <form id="edit-vendor-form" onsubmit="updateVendorForm(event)">
                 <input type="hidden" id="edit-vendor-id">
                 <div class="space-y-4">
                     <div>
@@ -160,45 +150,138 @@
 
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
+    <script src="/static/ag-grid-helper.js"></script>
     <script>
+        let vendorsGridApi = null;
+
         async function loadVendors() {
             const loadingEl = document.getElementById('vendors-loading');
             const errorEl = document.getElementById('vendors-error');
-            const tableContainer = document.getElementById('vendors-table-container');
-            const tbodyEl = document.getElementById('vendors-tbody');
+            const gridContainer = document.getElementById('vendors-grid-container');
+            
+            loadingEl.classList.remove('hidden');
+            errorEl.classList.add('hidden');
+            gridContainer.classList.add('hidden');
             
             try {
                 const vendors = await window.getVendors();
                 
-                if (vendors.length === 0) {
-                    tbodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No vendors found. Add one to get started.</td></tr>';
+                // Define column definitions with editable cells
+                const columnDefs = [
+                    { 
+                        field: 'name', 
+                        headerName: 'Name',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor'
+                    },
+                    { 
+                        field: 'gstin', 
+                        headerName: 'GSTIN',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor',
+                        cellRenderer: (params) => {
+                            if (!params.value || params.value.trim() === '') {
+                                return '<span class="text-red-600 font-semibold">⚠️ Missing</span>';
+                            }
+                            return params.value;
+                        },
+                        cellStyle: (params) => {
+                            if (!params.value || params.value.trim() === '') {
+                                return { backgroundColor: '#fef3c7' }; // Yellow background for missing GSTIN
+                            }
+                            return null;
+                        }
+                    },
+                    { 
+                        field: 'address', 
+                        headerName: 'Address',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 2,
+                        cellEditor: 'agLargeTextCellEditor',
+                        cellEditorParams: {
+                            maxLength: 500,
+                            rows: 3,
+                            cols: 50
+                        },
+                        cellRenderer: (params) => {
+                            return params.value || '-';
+                        }
+                    },
+                    { 
+                        field: 'contact_info', 
+                        headerName: 'Contact',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        editable: true,
+                        flex: 1,
+                        cellEditor: 'agTextCellEditor',
+                        cellRenderer: (params) => {
+                            return params.value || '-';
+                        }
+                    },
+                    { 
+                        field: 'created_at', 
+                        headerName: 'Created',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        editable: false,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '-';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    }
+                ];
+
+                // Initialize or update grid
+                if (!vendorsGridApi) {
+                    vendorsGridApi = window.agGridHelper.initAGGrid('vendors-grid-container', columnDefs, vendors, {
+                        pagination: true,
+                        paginationPageSize: 25,
+                        onCellValueChanged: async (params) => {
+                            // Save changes when cell is edited
+                            if (params.oldValue === params.newValue) return;
+                            
+                            try {
+                                const vendorId = params.data.vendor_id;
+                                const updateData = {
+                                    [params.colDef.field]: params.newValue || null
+                                };
+                                
+                                await window.updateVendor(vendorId, updateData);
+                                
+                                // Show success indicator
+                                params.node.setDataValue(params.colDef.field, params.newValue);
+                                
+                                // Reload to update GSTIN warning styling
+                                if (params.colDef.field === 'gstin') {
+                                    await loadVendors();
+                                }
+                            } catch (error) {
+                                // Revert on error
+                                params.node.setDataValue(params.colDef.field, params.oldValue);
+                                alert(`Error updating ${params.colDef.headerName}: ${error.message}`);
+                            }
+                        }
+                    });
                 } else {
-                    tbodyEl.innerHTML = vendors.map(vendor => {
-                        const date = new Date(vendor.created_at).toLocaleDateString('en-IN');
-                        const hasGstin = vendor.gstin && vendor.gstin.trim() !== '';
-                        const gstinDisplay = hasGstin ? vendor.gstin : `<span class="text-red-600 font-semibold">⚠️ Missing</span>`;
-                        
-                        return `
-                            <tr class="${!hasGstin ? 'bg-yellow-50' : ''}">
-                                <td class="font-medium">${vendor.name}</td>
-                                <td>${gstinDisplay}</td>
-                                <td>${vendor.address || '-'}</td>
-                                <td>${vendor.contact_info || '-'}</td>
-                                <td>${date}</td>
-                                <td>
-                                    <button onclick="showEditModal(${vendor.vendor_id}, '${vendor.name.replace(/'/g, "\\'")}', '${(vendor.gstin || '').replace(/'/g, "\\'")}', '${(vendor.address || '').replace(/'/g, "\\'")}', '${(vendor.contact_info || '').replace(/'/g, "\\'")}')" 
-                                            class="text-blue-600 hover:text-blue-800" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('');
+                    window.agGridHelper.updateGridData(vendorsGridApi, vendors);
                 }
                 
                 loadingEl.classList.add('hidden');
                 errorEl.classList.add('hidden');
-                tableContainer.classList.remove('hidden');
+                gridContainer.classList.remove('hidden');
             } catch (error) {
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
@@ -275,7 +358,7 @@
             document.getElementById('edit-vendor-message').innerHTML = '';
         }
 
-        async function updateVendor(event) {
+        async function updateVendorForm(event) {
             event.preventDefault();
             const messageEl = document.getElementById('edit-vendor-message');
             const vendorId = document.getElementById('edit-vendor-id').value;
