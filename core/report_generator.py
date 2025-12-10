@@ -26,24 +26,34 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = None):
+def regenerate_csvs(company_id: Optional[int] = None, user_id: Optional[int] = None, description: Optional[str] = None):
     """
     Regenerate all CSV reports from database and store in database
     Called automatically when journal entries are added
     
     Args:
+        company_id: Company ID to generate reports for. If None, uses current company (fallback)
         user_id: Optional user ID who triggered the generation
         description: Optional description for the report bundle
     """
     db = next(get_db())
     try:
-        current_company = CompanyManager.get_current_company()
-        if not current_company:
-            raise ValueError("No current company set")
+        # Use provided company_id, or fall back to current company
+        if company_id is None:
+            current_company = CompanyManager.get_current_company()
+            if not current_company:
+                raise ValueError("No current company set and no company_id provided")
+            company_id = current_company.company_id
+        else:
+            # Verify company exists
+            from database.models import Company
+            company = db.query(Company).filter(Company.company_id == company_id).first()
+            if not company:
+                raise ValueError(f"Company with ID {company_id} not found")
         
         # Get all journal entries
         entries = db.query(JournalEntry).filter(
-            JournalEntry.company_id == current_company.company_id
+            JournalEntry.company_id == company_id
         ).order_by(JournalEntry.date).all()
         
         # Convert to format expected by accounting_reports
@@ -85,7 +95,7 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
             bundle_description = f"Auto-generated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         
         bundle = ReportBundle(
-            company_id=current_company.company_id,
+            company_id=company_id,
             generated_by_user_id=user_id,
             description=bundle_description
         )
@@ -168,7 +178,7 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
             
             # Get bank transactions for cash flow
             bank_transactions = db.query(BankTransaction).filter(
-                BankTransaction.company_id == current_company.company_id
+                BankTransaction.company_id == company_id
             ).order_by(BankTransaction.date).all()
             
             bank_txns_list = [

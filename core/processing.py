@@ -173,7 +173,7 @@ def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
         db.commit()
         
         # Regenerate CSVs
-        regenerate_csvs()
+        regenerate_csvs(company_id=current_company.company_id)
         
         db.refresh(invoice)
         return invoice

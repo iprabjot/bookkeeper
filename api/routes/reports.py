@@ -427,7 +427,7 @@ async def generate_reports(
     logger = logging.getLogger(__name__)
     
     try:
-        bundle_id = regenerate_csvs(user_id=current_user.user_id, description=description)
+        bundle_id = regenerate_csvs(company_id=current_user.company_id, user_id=current_user.user_id, description=description)
         bundle = db.query(ReportBundle).filter(
             ReportBundle.bundle_id == bundle_id
         ).first()

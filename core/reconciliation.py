@@ -128,7 +128,7 @@ def reconcile_transactions() -> Dict:
         
         # Regenerate CSVs if any matches were found or existing ones were settled
         if matches or settled_existing > 0:
-            regenerate_csvs()
+            regenerate_csvs(company_id=current_company.company_id)
         
         return {
             "total_transactions": len(unmatched_txns),
@@ -230,7 +230,9 @@ def settle_reconciliation(reconciliation_id: int) -> Reconciliation:
         db.commit()
         
         # Regenerate CSVs (balances will be updated)
-        regenerate_csvs()
+        # Use company_id from invoice or transaction
+        company_id = invoice.company_id if invoice else transaction.company_id
+        regenerate_csvs(company_id=company_id)
         
         db.refresh(reconciliation)
         return reconciliation
