@@ -48,6 +48,7 @@
                                     <th>Address</th>
                                     <th>Contact</th>
                                     <th>Created</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="buyers-tbody"></tbody>
@@ -55,6 +56,55 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Edit Buyer Modal -->
+    <div id="edit-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Buyer</h3>
+                <button onclick="hideEditModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="edit-buyer-form" onsubmit="updateBuyer(event)">
+                <input type="hidden" id="edit-buyer-id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <input type="text" id="edit-buyer-name" class="form-input" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">GSTIN</label>
+                        <input type="text" id="edit-buyer-gstin" class="form-input" placeholder="15-character GSTIN">
+                        <p class="text-xs text-gray-500 mt-1">Important: GSTIN is required for tax compliance.</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea id="edit-buyer-address" class="form-input" rows="3"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Contact Info</label>
+                        <input type="text" id="edit-buyer-contact" class="form-input" placeholder="Phone, Email">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex gap-3">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save mr-2"></i>Update Buyer
+                    </button>
+                    <button type="button" onclick="hideEditModal()" class="btn-secondary">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+            
+            <div id="edit-buyer-message" class="mt-4"></div>
         </div>
     </div>
 
@@ -118,7 +168,7 @@
                 const buyers = await window.getBuyers();
                 
                 if (buyers.length === 0) {
-                    tbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No buyers found. Add one to get started.</td></tr>';
+                    tbodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No buyers found. Add one to get started.</td></tr>';
                 } else {
                     tbodyEl.innerHTML = buyers.map(buyer => {
                         const date = new Date(buyer.created_at).toLocaleDateString('en-IN');
@@ -130,6 +180,12 @@
                                 <td>${buyer.address || '-'}</td>
                                 <td>${buyer.contact_info || '-'}</td>
                                 <td>${date}</td>
+                                <td>
+                                    <button onclick="showEditModal(${buyer.buyer_id}, '${buyer.name.replace(/'/g, "\\'")}', '${(buyer.gstin || '').replace(/'/g, "\\'")}', '${(buyer.address || '').replace(/'/g, "\\'")}', '${(buyer.contact_info || '').replace(/'/g, "\\'")}')" 
+                                            class="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     }).join('');
@@ -171,6 +227,45 @@
                 messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Buyer added successfully!</div>';
                 hideAddModal();
                 loadBuyers();
+            } catch (error) {
+                messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
+            }
+        }
+
+        function showEditModal(buyerId, name, gstin, address, contact) {
+            document.getElementById('edit-buyer-id').value = buyerId;
+            document.getElementById('edit-buyer-name').value = name;
+            document.getElementById('edit-buyer-gstin').value = gstin;
+            document.getElementById('edit-buyer-address').value = address;
+            document.getElementById('edit-buyer-contact').value = contact;
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function hideEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            document.getElementById('edit-buyer-form').reset();
+            document.getElementById('edit-buyer-message').innerHTML = '';
+        }
+
+        async function updateBuyer(event) {
+            event.preventDefault();
+            const messageEl = document.getElementById('edit-buyer-message');
+            const buyerId = document.getElementById('edit-buyer-id').value;
+            
+            const data = {
+                name: document.getElementById('edit-buyer-name').value,
+                gstin: document.getElementById('edit-buyer-gstin').value || null,
+                address: document.getElementById('edit-buyer-address').value || null,
+                contact_info: document.getElementById('edit-buyer-contact').value || null
+            };
+            
+            try {
+                await window.updateBuyer(buyerId, data);
+                messageEl.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"> Buyer updated successfully!</div>';
+                setTimeout(() => {
+                    hideEditModal();
+                    loadBuyers();
+                }, 1000);
             } catch (error) {
                 messageEl.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"> Error: ${error.message}</div>`;
             }
