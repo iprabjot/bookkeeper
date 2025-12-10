@@ -111,13 +111,12 @@ def extract_text_from_pdf(pdf_path, use_ocr=False):
             print(error_msg)
             return None
     
-    finally:
-        # Clean up temp file if we downloaded from S3
-        if temp_file and os.path.exists(local_path):
-            try:
-                os.unlink(local_path)
-            except:
-                pass
+    # Clean up temp file if we downloaded from S3
+    if temp_file and os.path.exists(local_path) and local_path != pdf_path:
+        try:
+            os.unlink(local_path)
+        except:
+            pass
     
     return text if text.strip() else None
 
@@ -444,11 +443,12 @@ def parse_vendor_customer(text):
     # Extract vendor address and contact
     if info["vendor_name"]:
         vendor_section = header_text
-        # Look for address patterns after vendor name
+        # First, try explicit address labels
         address_patterns = [
             r'(?:Address|ADDRESS)[:\s]*([^\n]{10,200})',
             r'(?:Add[:\s]*|Addr[:\s]*)([^\n]{10,200})',
         ]
+        address_found = False
         for pattern in address_patterns:
             addr_match = re.search(pattern, vendor_section, re.IGNORECASE)
             if addr_match:
@@ -458,7 +458,40 @@ def parse_vendor_customer(text):
                 address = address.split('\n')[0].strip()
                 if len(address) > 10:
                     info["vendor_address"] = address
+                    address_found = True
                     break
+        
+        # If no explicit address label found, look for address after vendor name
+        if not address_found:
+            vendor_name_pattern = re.escape(info["vendor_name"])
+            name_match = re.search(vendor_name_pattern, vendor_section, re.IGNORECASE)
+            if name_match:
+                # Get text after vendor name (up to GSTIN or next section)
+                text_after_name = vendor_section[name_match.end():]
+                # Stop at GSTIN, State, or next major section
+                stop_pattern = r'(?:GSTIN|State:|State\s*:|Phone|Mobile|Email|Invoice|Bill)'
+                stop_match = re.search(stop_pattern, text_after_name, re.IGNORECASE)
+                if stop_match:
+                    address_candidate = text_after_name[:stop_match.start()].strip()
+                else:
+                    # Take first 300 chars after name
+                    address_candidate = text_after_name[:300].strip()
+                
+                # Clean up the address candidate
+                address_candidate = re.sub(r'\s+', ' ', address_candidate)
+                # Look for address-like patterns
+                pincode_pattern = r'\b\d{6}\b'
+                street_pattern = r'(?:STREET|ROAD|AVENUE|LANE|AREA|INDUSTRIAL|ZONE|SECTOR|BLOCK)'
+                
+                if (re.search(pincode_pattern, address_candidate) or 
+                    re.search(street_pattern, address_candidate, re.IGNORECASE) or
+                    len(address_candidate) > 20):
+                    # This looks like an address
+                    lines = [line.strip() for line in address_candidate.split(',') if line.strip()]
+                    if lines:
+                        address = ', '.join(lines[:5])
+                        if len(address) > 10 and len(address) < 300:
+                            info["vendor_address"] = address
         
         # Extract contact info (phone, email)
         contact_patterns = [
@@ -478,13 +511,14 @@ def parse_vendor_customer(text):
         # Find customer section (after "Bill To" or "Billed To")
         customer_section_start = re.search(r'(?:Bill\s+To|Billed\s+To|Buyer)', text, re.IGNORECASE)
         if customer_section_start:
-            customer_section = text[customer_section_start.end():customer_section_start.end()+500]
+            customer_section = text[customer_section_start.end():customer_section_start.end()+800]
             
-            # Look for address patterns
+            # First, try explicit address labels
             address_patterns = [
                 r'(?:Address|ADDRESS)[:\s]*([^\n]{10,200})',
                 r'(?:Add[:\s]*|Addr[:\s]*)([^\n]{10,200})',
             ]
+            address_found = False
             for pattern in address_patterns:
                 addr_match = re.search(pattern, customer_section, re.IGNORECASE)
                 if addr_match:
@@ -493,7 +527,46 @@ def parse_vendor_customer(text):
                     address = address.split('\n')[0].strip()
                     if len(address) > 10:
                         info["customer_address"] = address
+                        address_found = True
                         break
+            
+            # If no explicit address label found, look for address after company name
+            if not address_found:
+                # Find the customer name in the section
+                customer_name_pattern = re.escape(info["customer_name"])
+                name_match = re.search(customer_name_pattern, customer_section, re.IGNORECASE)
+                if name_match:
+                    # Get text after company name (up to GSTIN or next section)
+                    text_after_name = customer_section[name_match.end():]
+                    # Stop at GSTIN, State, or next major section
+                    stop_pattern = r'(?:GSTIN|State:|State\s*:|Phone|Mobile|Email|Item|#)'
+                    stop_match = re.search(stop_pattern, text_after_name, re.IGNORECASE)
+                    if stop_match:
+                        address_candidate = text_after_name[:stop_match.start()].strip()
+                    else:
+                        # Take first 300 chars after name
+                        address_candidate = text_after_name[:300].strip()
+                    
+                    # Clean up the address candidate
+                    # Remove extra whitespace and newlines
+                    address_candidate = re.sub(r'\s+', ' ', address_candidate)
+                    # Look for address-like patterns (contains pincode, city, state, or street indicators)
+                    pincode_pattern = r'\b\d{6}\b'  # 6-digit pincode
+                    city_state_pattern = r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*'  # City/State names
+                    street_pattern = r'(?:STREET|ROAD|AVENUE|LANE|AREA|INDUSTRIAL|ZONE|SECTOR|BLOCK)'
+                    
+                    if (re.search(pincode_pattern, address_candidate) or 
+                        re.search(street_pattern, address_candidate, re.IGNORECASE) or
+                        len(address_candidate) > 20):
+                        # This looks like an address
+                        # Split by common delimiters and take the meaningful parts
+                        lines = [line.strip() for line in address_candidate.split(',') if line.strip()]
+                        if lines:
+                            # Join lines, but limit to reasonable length
+                            address = ', '.join(lines[:5])  # Max 5 address components
+                            if len(address) > 10 and len(address) < 300:
+                                info["customer_address"] = address
+                                address_found = True
             
             # Extract contact info
             contact_patterns = [
@@ -528,10 +601,10 @@ def extract_with_ai(text: str) -> dict:
         )
         
         prompt = f"""Extract invoice information from the following invoice text and return ONLY valid JSON. 
-Focus on Indian GST invoices. Extract all relevant fields accurately.
+Focus on Indian GST invoices. Extract all relevant fields accurately, especially addresses and contact information.
 
 Invoice Text:
-{text[:4000]}
+{text[:6000]}
 
 Return a JSON object with these exact fields:
 {{
@@ -588,8 +661,12 @@ JSON:"""
                 "sgst": float(invoice_data.get("sgst", 0)) if invoice_data.get("sgst") else None,
                 "vendor_name": invoice_data.get("vendor_name") or None,
                 "vendor_gstin": invoice_data.get("vendor_gstin") or None,
+                "vendor_address": invoice_data.get("vendor_address") or None,
+                "vendor_contact": invoice_data.get("vendor_contact") or None,
                 "customer_name": invoice_data.get("customer_name") or None,
                 "customer_gstin": invoice_data.get("customer_gstin") or None,
+                "customer_address": invoice_data.get("customer_address") or None,
+                "customer_contact": invoice_data.get("customer_contact") or None,
             }
             
             print(f"AI extraction successful")
@@ -634,25 +711,48 @@ def process_invoice_pdf(pdf_path, use_ocr=False, use_ai=True):
         print(error_msg)
         return None
     
+    # Initialize invoice data
+    invoice_data = {
+        "file_path": str(pdf_path),
+    }
+    
     # Try AI-based extraction first if available and requested
     if use_ai and AI_EXTRACTION_AVAILABLE:
         print("Attempting AI-based extraction...")
         ai_result = extract_with_ai(text)
         if ai_result and (ai_result.get("invoice_number") or ai_result.get("total_amount") or ai_result.get("vendor_name")):
-            # AI extraction successful, use it
-            ai_result["file_path"] = str(pdf_path)
+            # AI extraction successful, use it as base
+            invoice_data.update(ai_result)
             print("Using AI-extracted data")
-            return ai_result
+            
+            # Enhance with regex if AI missed address/contact details
+            if not invoice_data.get("vendor_address") or not invoice_data.get("customer_address"):
+                print("AI missed some addresses, trying regex enhancement...")
+                vendor_customer = parse_vendor_customer(text)
+                # Only update if AI didn't extract it
+                if not invoice_data.get("vendor_address") and vendor_customer.get("vendor_address"):
+                    invoice_data["vendor_address"] = vendor_customer["vendor_address"]
+                    print("  ✓ Added vendor address from regex")
+                if not invoice_data.get("vendor_contact") and vendor_customer.get("vendor_contact"):
+                    invoice_data["vendor_contact"] = vendor_customer["vendor_contact"]
+                    print("  ✓ Added vendor contact from regex")
+                if not invoice_data.get("customer_address") and vendor_customer.get("customer_address"):
+                    invoice_data["customer_address"] = vendor_customer["customer_address"]
+                    print("  ✓ Added customer address from regex")
+                if not invoice_data.get("customer_contact") and vendor_customer.get("customer_contact"):
+                    invoice_data["customer_contact"] = vendor_customer["customer_contact"]
+                    print("  ✓ Added customer contact from regex")
+            
+            return invoice_data
         else:
             print("AI extraction incomplete, falling back to regex patterns...")
     
     # Fall back to regex-based extraction
-    invoice_data = {
+    invoice_data.update({
         "invoice_number": parse_invoice_number(text),
         "invoice_date": parse_date(text),
         "total_amount": parse_amounts(text),
-        "file_path": str(pdf_path),
-    }
+    })
     
     # Parse GST details
     gst_info = parse_gst_details(text)
