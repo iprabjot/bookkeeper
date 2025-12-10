@@ -93,7 +93,27 @@ async def send_email(
         logger.info(f"Email sent successfully to {to_email}: {subject}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {type(e).__name__}: {str(e)}", exc_info=True)
+        error_type = type(e).__name__
+        error_msg = str(e)
+        
+        # Check if this is a Railway SMTP timeout issue
+        is_railway_timeout = (
+            "SMTPConnectTimeoutError" in error_type or 
+            "Timed out connecting" in error_msg or
+            "timeout" in error_msg.lower()
+        )
+        
+        if is_railway_timeout and SMTP_HOST == "smtp.gmail.com":
+            logger.error(
+                f"Failed to send email to {to_email}: Gmail SMTP timeout on Railway. "
+                f"This is expected - Railway blocks Gmail SMTP. "
+                f"Please switch to SendGrid (see docs/RAILWAY_SMTP_TROUBLESHOOTING.md). "
+                f"Error: {error_type}: {error_msg}",
+                exc_info=True
+            )
+        else:
+            logger.error(f"Failed to send email to {to_email}: {error_type}: {error_msg}", exc_info=True)
+        
         return False
 
 
