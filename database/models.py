@@ -229,6 +229,8 @@ class ReportType(str, enum.Enum):
     JOURNAL_ENTRIES = "journal_entries"
     TRIAL_BALANCE = "trial_balance"
     LEDGER = "ledger"
+    PROFIT_LOSS = "profit_loss"
+    CASH_FLOW = "cash_flow"
 
 
 class ReportBundle(Base):
@@ -252,7 +254,7 @@ class Report(Base):
     report_id = Column(Integer, primary_key=True, index=True)
     bundle_id = Column(Integer, ForeignKey("report_bundles.bundle_id"), nullable=False)
     report_type = Column(
-        postgresql.ENUM('journal_entries', 'trial_balance', 'ledger', name='reporttype', create_type=False),
+        postgresql.ENUM('journal_entries', 'trial_balance', 'ledger', 'profit_loss', 'cash_flow', name='reporttype', create_type=False),
         nullable=False
     )
     account_name = Column(String, nullable=True)  # For ledger reports
