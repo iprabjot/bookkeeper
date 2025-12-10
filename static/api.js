@@ -330,6 +330,22 @@ async function createBuyer(data) {
     });
 }
 
+async function updateVendor(vendorId, data) {
+    return apiRequest(`/vendors/${vendorId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+}
+
+async function updateBuyer(buyerId, data) {
+    return apiRequest(`/buyers/${buyerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+}
+
 async function getProfitLossCsv(bundleId = null) {
     const params = bundleId ? `?bundle_id=${bundleId}` : '';
     return apiRequest(`/reports/profit-loss${params}`);
@@ -479,8 +495,6 @@ window.getVendors = getVendors;
 window.getBuyers = getBuyers;
 window.createVendor = createVendor;
 window.createBuyer = createBuyer;
-window.updateVendor = updateVendor;
-window.updateBuyer = updateBuyer;
 window.updateVendor = updateVendor;
 window.updateBuyer = updateBuyer;
 window.getProfitLossCsv = getProfitLossCsv;
