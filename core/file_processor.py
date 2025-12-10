@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from database.models import FileUpload, FileUploadStatus, Invoice
 from utils.invoice_extractor import process_invoice_pdf
 from core.processing import process_invoice
+from core.storage import get_storage_service
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -27,26 +28,86 @@ def process_invoice_file(upload_id: int, db: Session):
         upload.status = FileUploadStatus.PROCESSING
         db.commit()
         
-        # Check if file still exists
-        if not os.path.exists(upload.file_path):
+        # Check if file exists (local file) or is S3 URL
+        local_file_path = upload.file_path
+        temp_downloaded = False
+        
+        if upload.file_path.startswith("http"):
+            # File is already in S3, download temporarily for processing
+            storage = get_storage_service()
+            if storage.enabled:
+                # Extract object key from URL
+                # Format: https://endpoint/bucket/key or https://bucket.s3.region.amazonaws.com/key
+                import tempfile
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                local_file_path = tmp_file.name
+                tmp_file.close()
+                temp_downloaded = True
+                
+                # Extract object key from URL
+                if "/" in upload.file_path:
+                    parts = upload.file_path.split("/")
+                    if storage.bucket_name in parts:
+                        object_key = "/".join(parts[parts.index(storage.bucket_name) + 1:])
+                    else:
+                        # Try to find the key after the last known part
+                        object_key = parts[-1]
+                else:
+                    object_key = upload.file_path.split("/")[-1]
+                
+                if not storage.download_file(object_key, local_file_path):
+                    raise FileNotFoundError(f"Could not download file from S3: {upload.file_path}")
+            else:
+                raise FileNotFoundError(f"File is in S3 but S3 storage is not enabled: {upload.file_path}")
+        elif not os.path.exists(upload.file_path):
             raise FileNotFoundError(f"File not found: {upload.file_path}")
         
         # Extract invoice data
-        invoice_data = process_invoice_pdf(upload.file_path, use_ocr=True, use_ai=True)
+        invoice_data = process_invoice_pdf(local_file_path, use_ocr=True, use_ai=True)
         if not invoice_data:
             raise ValueError(
                 "Could not extract invoice data from PDF. "
                 "The PDF appears to be image-based and text extraction failed."
             )
         
+        # Save file to persistent storage (S3 or local)
+        storage = get_storage_service()
+        persistent_path = None
+        
+        if upload.file_path.startswith("http"):
+            # Already in S3, use the URL
+            persistent_path = upload.file_path
+        else:
+            # Save to persistent storage
+            object_key = storage.generate_object_key(
+                file_type="invoice",
+                company_id=upload.company_id,
+                filename=upload.filename
+            )
+            persistent_path = storage.upload_file(
+                local_file_path,
+                object_key,
+                content_type="application/pdf"
+            )
+            if persistent_path:
+                logger.info(f"Saved invoice to persistent storage: {persistent_path}")
+            else:
+                # Fallback to original path if storage failed
+                persistent_path = local_file_path
+                logger.warning(f"Failed to save to persistent storage, using original path: {local_file_path}")
+        
         # Process invoice (create journal entry, etc.)
-        invoice = process_invoice(invoice_data, upload.file_path, company_id=upload.company_id)
+        invoice = process_invoice(invoice_data, persistent_path, company_id=upload.company_id)
         
         # Update upload record with success
         upload.status = FileUploadStatus.COMPLETED
         upload.invoice_id = invoice.invoice_id
         upload.processed_at = datetime.utcnow()
         upload.error_message = None
+        
+        # Update file_path to persistent path
+        upload.file_path = persistent_path
+        
         db.commit()
         
         logger.info(f"Successfully processed invoice file {upload.filename} (upload_id: {upload_id})")
@@ -59,13 +120,4 @@ def process_invoice_file(upload_id: int, db: Session):
         db.commit()
         
         logger.error(f"Failed to process invoice file {upload.filename} (upload_id: {upload_id}): {e}", exc_info=True)
-    
-    finally:
-        # Clean up temp file after processing
-        try:
-            if os.path.exists(upload.file_path):
-                os.unlink(upload.file_path)
-                logger.debug(f"Cleaned up temp file: {upload.file_path}")
-        except Exception as e:
-            logger.warning(f"Failed to clean up temp file {upload.file_path}: {e}")
 

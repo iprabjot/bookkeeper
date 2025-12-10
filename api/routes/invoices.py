@@ -7,6 +7,7 @@ from api.schemas import InvoiceResponse, BulkUploadResponse, FileUploadResponse
 from utils.invoice_extractor import process_invoice_pdf
 from core.processing import process_invoice
 from core.file_processor import process_invoice_file
+from core.storage import get_storage_service
 from core.auth import get_current_user
 from database.models import User, FileUpload, FileUploadStatus
 from database.db import get_db
@@ -24,7 +25,10 @@ async def upload_invoice(file: UploadFile = File(...), current_user: User = Depe
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
-    # Save uploaded file temporarily
+    # Save uploaded file temporarily for processing
+    import logging
+    logger = logging.getLogger(__name__)
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
         content = await file.read()
         tmp_file.write(content)
@@ -45,8 +49,28 @@ async def upload_invoice(file: UploadFile = File(...), current_user: User = Depe
             )
             raise HTTPException(status_code=400, detail=error_detail)
         
+        # Save to persistent storage (S3 or local)
+        storage = get_storage_service()
+        object_key = storage.generate_object_key(
+            file_type="invoice",
+            company_id=current_user.company_id,
+            filename=file.filename
+        )
+        persistent_path = storage.upload_file(
+            tmp_path,
+            object_key,
+            content_type="application/pdf"
+        )
+        
+        if not persistent_path:
+            # Fallback to temp path if storage failed
+            persistent_path = tmp_path
+            logger.warning(f"Failed to save to persistent storage, using temp path: {tmp_path}")
+        else:
+            logger.info(f"Saved invoice to persistent storage: {persistent_path}")
+        
         # Process invoice (create journal entry, etc.)
-        invoice = process_invoice(invoice_data, tmp_path, company_id=current_user.company_id)
+        invoice = process_invoice(invoice_data, persistent_path, company_id=current_user.company_id)
         
         return invoice
     except ValueError as e:
@@ -54,17 +78,17 @@ async def upload_invoice(file: UploadFile = File(...), current_user: User = Depe
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Log full error for debugging
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Invoice processing error: {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to process invoice. Please try again later or contact support."
         )
     finally:
-        # Clean up temp file
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        # Clean up temp file only if we successfully saved to persistent storage
+        if 'persistent_path' in locals() and persistent_path != tmp_path:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+                logger.debug(f"Cleaned up temp file after saving to persistent storage")
 
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
@@ -101,6 +125,82 @@ async def get_invoice(invoice_id: int, current_user: User = Depends(get_current_
         return invoice
     finally:
         db.close()
+
+
+@router.get("/invoices/{invoice_id}/download")
+async def download_invoice_pdf(
+    invoice_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download invoice PDF file"""
+    from database.models import Invoice
+    from fastapi.responses import StreamingResponse
+    from core.storage import get_storage_service
+    
+    invoice = db.query(Invoice).filter(
+        Invoice.invoice_id == invoice_id,
+        Invoice.company_id == current_user.company_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # If file is in S3, generate presigned URL or download
+    if invoice.file_path.startswith("http"):
+        storage = get_storage_service()
+        if storage.enabled:
+            # Extract object key from URL
+            if "/" in invoice.file_path:
+                parts = invoice.file_path.split("/")
+                if storage.bucket_name in parts:
+                    object_key = "/".join(parts[parts.index(storage.bucket_name) + 1:])
+                else:
+                    object_key = parts[-1]
+            else:
+                object_key = invoice.file_path.split("/")[-1]
+            
+            # Generate presigned URL for direct download
+            presigned_url = storage.get_file_url(object_key, expires_in=3600)
+            if presigned_url:
+                from fastapi.responses import RedirectResponse
+                return RedirectResponse(url=presigned_url)
+            
+            # Fallback: download and stream
+            import tempfile
+            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            tmp_path = tmp_file.name
+            tmp_file.close()
+            
+            if storage.download_file(object_key, tmp_path):
+                def cleanup():
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                
+                file_obj = open(tmp_path, 'rb')
+                return StreamingResponse(
+                    file_obj,
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{invoice.invoice_number}.pdf"'
+                    }
+                )
+    
+    # Local file
+    if os.path.exists(invoice.file_path):
+        def file_generator():
+            with open(invoice.file_path, 'rb') as f:
+                yield from f
+        
+        return StreamingResponse(
+            file_generator(),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{invoice.invoice_number}.pdf"'
+            }
+        )
+    
+    raise HTTPException(status_code=404, detail="Invoice PDF file not found")
 
 
 @router.post("/invoices/upload-multiple", response_model=BulkUploadResponse)

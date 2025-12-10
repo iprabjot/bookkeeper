@@ -207,12 +207,13 @@ def process_invoice(invoice_data: Dict, file_path: str, company_id: int = None) 
                 )
         
         # Create invoice record
+        # file_path can be either local path or S3 URL
         invoice = Invoice(
             company_id=company_id,
             vendor_id=vendor_id,
             buyer_id=buyer_id,
             invoice_type=invoice_type,
-            file_path=file_path,
+            file_path=file_path,  # Can be local path or S3 URL
             invoice_number=invoice_number,
             invoice_date=invoice_date,
             amount=invoice_amount,

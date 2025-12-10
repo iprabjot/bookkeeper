@@ -8,9 +8,9 @@ Supports AI-based extraction using LLM for better accuracy.
 import pdfplumber
 import re
 import json
+import os
 from datetime import datetime
 from pathlib import Path
-import os
 
 # Try to import OCR libraries (optional)
 try:
@@ -37,15 +37,44 @@ def extract_text_from_pdf(pdf_path, use_ocr=False):
     Extract all text from a PDF file.
     
     Args:
-        pdf_path: Path to PDF file
+        pdf_path: Path to PDF file (local path or S3 URL)
         use_ocr: If True and text extraction fails, try OCR (requires pytesseract)
     
     Returns:
         Extracted text string, or None if extraction fails
     """
+    # Handle S3 URLs - download temporarily if needed
+    local_path = pdf_path
+    temp_file = None
+    
+    if pdf_path.startswith("http"):
+        # Download from S3 temporarily
+        from core.storage import get_storage_service
+        import tempfile
+        
+        storage = get_storage_service()
+        if storage.enabled:
+            # Extract object key from URL
+            if "/" in pdf_path:
+                parts = pdf_path.split("/")
+                if storage.bucket_name in parts:
+                    object_key = "/".join(parts[parts.index(storage.bucket_name) + 1:])
+                else:
+                    object_key = parts[-1]
+            else:
+                object_key = pdf_path.split("/")[-1]
+            
+            # Download to temp file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            local_path = temp_file.name
+            temp_file.close()
+            
+            if not storage.download_file(object_key, local_path):
+                return None
+    
     text = ""
     try:
-        with pdfplumber.open(pdf_path) as pdf:
+        with pdfplumber.open(local_path) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
@@ -59,7 +88,7 @@ def extract_text_from_pdf(pdf_path, use_ocr=False):
         print(f"No text found in PDF, attempting OCR...")
         try:
             # Convert PDF pages to images
-            images = convert_from_path(pdf_path, dpi=300)
+            images = convert_from_path(local_path, dpi=300)
             for img in images:
                 ocr_text = pytesseract.image_to_string(img)
                 text += ocr_text + "\n"
@@ -81,6 +110,14 @@ def extract_text_from_pdf(pdf_path, use_ocr=False):
             
             print(error_msg)
             return None
+    
+    finally:
+        # Clean up temp file if we downloaded from S3
+        if temp_file and os.path.exists(local_path):
+            try:
+                os.unlink(local_path)
+            except:
+                pass
     
     return text if text.strip() else None
 

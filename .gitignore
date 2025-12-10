@@ -71,3 +71,5 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+storage/
+# Local file storage (persistent)
