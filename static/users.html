@@ -11,52 +11,7 @@
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
-            <div class="p-6 border-b border-gray-200">
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    <i class="fas fa-book text-blue-600 mr-2"></i>Bookkeeper
-                </h1>
-            </div>
-            <nav class="flex-1 p-4 space-y-2">
-                <a href="index.html" class="nav-link">
-                    <i class="fas fa-chart-line w-5"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="invoices.html" class="nav-link">
-                    <i class="fas fa-file-invoice w-5"></i>
-                    <span>Invoices</span>
-                </a>
-                <a href="bank-statements.html" class="nav-link">
-                    <i class="fas fa-university w-5"></i>
-                    <span>Bank Statements</span>
-                </a>
-                <a href="reports.html" class="nav-link">
-                    <i class="fas fa-chart-bar w-5"></i>
-                    <span>Reports</span>
-                </a>
-                <a href="vendors.html" class="nav-link">
-                    <i class="fas fa-truck w-5"></i>
-                    <span>Vendors</span>
-                </a>
-                <a href="buyers.html" class="nav-link">
-                    <i class="fas fa-users w-5"></i>
-                    <span>Buyers</span>
-                </a>
-                <a href="users.html" class="nav-link active">
-                    <i class="fas fa-user-shield w-5"></i>
-                    <span>Users</span>
-                </a>
-                <a href="company.html" class="nav-link">
-                    <i class="fas fa-building w-5"></i>
-                    <span>Company</span>
-                </a>
-            </nav>
-            <div class="p-4 border-t border-gray-200">
-                <button onclick="window.logout()" class="w-full btn-secondary">
-                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                </button>
-            </div>
-        </aside>
+        <div id="sidebar-container"></div>
 
         <div class="flex-1 flex flex-col overflow-hidden">
             <header class="bg-white border-b border-gray-200 px-6 py-4">
@@ -195,6 +150,7 @@
     </div>
 
     <script src="/static/api.js"></script>
+    <script src="/static/sidebar.js"></script>
     <script>
         let currentUser = null;
         let users = [];
@@ -420,6 +376,7 @@
 
         // Check authentication on page load
         document.addEventListener('DOMContentLoaded', async () => {
+            initSidebar('users.html');
             const token = localStorage.getItem('access_token');
             if (!token) {
                 window.location.href = 'login.html';
