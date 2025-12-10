@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- AG Grid Community Edition -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
@@ -49,21 +53,7 @@
                     
                     <div id="transactions-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                     
-                    <div class="table-container hidden" id="transactions-table-container">
-                        <table id="transactions-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Reference</th>
-                                    <th>Type</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="transactions-tbody"></tbody>
-                        </table>
-                    </div>
+                    <div id="transactions-grid-container" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
                 </div>
             </main>
         </div>
@@ -72,6 +62,7 @@
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
     <script src="/static/upload-component.js"></script>
+    <script src="/static/ag-grid-helper.js"></script>
     <script>
         // Initialize bank statement upload component
         let bankUploadComponent;
@@ -100,45 +91,120 @@
             loadTransactions();
         });
         
+        let transactionsGridApi = null;
+
         async function loadTransactions() {
             const loadingEl = document.getElementById('transactions-loading');
             const errorEl = document.getElementById('transactions-error');
-            const tableContainer = document.getElementById('transactions-table-container');
-            const tbodyEl = document.getElementById('transactions-tbody');
+            const gridContainer = document.getElementById('transactions-grid-container');
+            
+            loadingEl.classList.remove('hidden');
+            errorEl.classList.add('hidden');
+            gridContainer.classList.add('hidden');
             
             try {
                 const transactions = await window.getBankTransactions();
                 
-                if (transactions.length === 0) {
-                    tbodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No transactions found</td></tr>';
+                // Define column definitions for AG Grid
+                const columnDefs = [
+                    { 
+                        field: 'date', 
+                        headerName: 'Date',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '-';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    },
+                    { 
+                        field: 'description', 
+                        headerName: 'Description',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        flex: 2
+                    },
+                    { 
+                        field: 'reference', 
+                        headerName: 'Reference',
+                        filter: 'agTextColumnFilter',
+                        sortable: true
+                    },
+                    { 
+                        field: 'type', 
+                        headerName: 'Type',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            const type = params.value || '';
+                            const typeUpper = type.toUpperCase();
+                            // Clean, professional badge colors
+                            const badgeClass = type.toLowerCase() === 'credit' 
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                                : 'bg-red-50 text-red-700 border border-red-200';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}">${escapeHtml(typeUpper)}</span>`;
+                        }
+                    },
+                    { 
+                        field: 'amount', 
+                        headerName: 'Amount',
+                        filter: 'agNumberColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (params.value === null || params.value === undefined) return '-';
+                            return `<span class="font-semibold">₹${Number(params.value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                        },
+                        type: 'numericColumn'
+                    },
+                    { 
+                        field: 'status', 
+                        headerName: 'Status',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            const status = params.value || '';
+                            const statusUpper = status.toUpperCase();
+                            // Clean, professional badge colors
+                            const statusColors = {
+                                'matched': 'bg-blue-50 text-blue-700 border border-blue-200',
+                                'settled': 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                                'unmatched': 'bg-amber-50 text-amber-700 border border-amber-200'
+                            };
+                            const badgeClass = statusColors[status.toLowerCase()] || 'bg-gray-50 text-gray-700 border border-gray-200';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}">${escapeHtml(statusUpper)}</span>`;
+                        }
+                    }
+                ];
+
+                // Initialize or update grid
+                if (!transactionsGridApi) {
+                    transactionsGridApi = window.agGridHelper.initAGGrid('transactions-grid-container', columnDefs, transactions, {
+                        pagination: true,
+                        paginationPageSize: 50
+                    });
                 } else {
-                    tbodyEl.innerHTML = transactions.map(txn => {
-                        const date = new Date(txn.date).toLocaleDateString('en-IN');
-                        const amount = `₹${txn.amount.toLocaleString('en-IN')}`;
-                        const typeBadge = `<span class="badge badge-${txn.type}">${txn.type}</span>`;
-                        const statusBadge = `<span class="badge badge-${txn.status}">${txn.status}</span>`;
-                        
-                        return `
-                            <tr>
-                                <td>${date}</td>
-                                <td>${txn.description || '-'}</td>
-                                <td>${txn.reference || '-'}</td>
-                                <td>${typeBadge}</td>
-                                <td class="font-semibold">${amount}</td>
-                                <td>${statusBadge}</td>
-                            </tr>
-                        `;
-                    }).join('');
+                    window.agGridHelper.updateGridData(transactionsGridApi, transactions);
                 }
                 
                 loadingEl.classList.add('hidden');
                 errorEl.classList.add('hidden');
-                tableContainer.classList.remove('hidden');
+                gridContainer.classList.remove('hidden');
             } catch (error) {
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
                 errorEl.textContent = `Error loading transactions: ${error.message}`;
             }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '-';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         async function runReconciliationUI() {

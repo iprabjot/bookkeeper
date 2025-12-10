@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- AG Grid Community Edition -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden">
@@ -49,20 +53,7 @@
                         
                         <div id="sales-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                         
-                        <div class="table-container hidden" id="sales-table-container">
-                            <table id="sales-table">
-                                <thead>
-                                    <tr>
-                                        <th>Invoice #</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                        <th>Buyer</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sales-tbody"></tbody>
-                            </table>
-                        </div>
+                        <div id="sales-grid-container" class="ag-theme-alpine" style="height: 400px; width: 100%;"></div>
                     </div>
 
                     <!-- Purchase Invoices Section -->
@@ -82,20 +73,7 @@
                         
                         <div id="purchase-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
                         
-                        <div class="table-container hidden" id="purchase-table-container">
-                            <table id="purchase-table">
-                                <thead>
-                                    <tr>
-                                        <th>Invoice #</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                        <th>Vendor</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="purchase-tbody"></tbody>
-                            </table>
-                        </div>
+                        <div id="purchase-grid-container" class="ag-theme-alpine" style="height: 400px; width: 100%;"></div>
                     </div>
                 </div>
             </main>
@@ -105,6 +83,7 @@
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
     <script src="/static/upload-component.js"></script>
+    <script src="/static/ag-grid-helper.js"></script>
     <script>
         // Initialize invoice upload component
         let invoiceUploadComponent;
@@ -136,16 +115,25 @@
             loadInvoices();
         });
 
+        let salesGridApi = null;
+        let purchaseGridApi = null;
+
         async function loadInvoices() {
             const salesLoadingEl = document.getElementById('sales-loading');
             const salesErrorEl = document.getElementById('sales-error');
-            const salesTableContainer = document.getElementById('sales-table-container');
-            const salesTbodyEl = document.getElementById('sales-tbody');
+            const salesGridContainer = document.getElementById('sales-grid-container');
             
             const purchaseLoadingEl = document.getElementById('purchase-loading');
             const purchaseErrorEl = document.getElementById('purchase-error');
-            const purchaseTableContainer = document.getElementById('purchase-table-container');
-            const purchaseTbodyEl = document.getElementById('purchase-tbody');
+            const purchaseGridContainer = document.getElementById('purchase-grid-container');
+            
+            salesLoadingEl.classList.remove('hidden');
+            salesErrorEl.classList.add('hidden');
+            salesGridContainer.classList.add('hidden');
+            
+            purchaseLoadingEl.classList.remove('hidden');
+            purchaseErrorEl.classList.add('hidden');
+            purchaseGridContainer.classList.add('hidden');
             
             try {
                 const invoices = await window.getInvoices();
@@ -154,60 +142,157 @@
                 const salesInvoices = invoices.filter(inv => inv.invoice_type === 'sales');
                 const purchaseInvoices = invoices.filter(inv => inv.invoice_type === 'purchase');
                 
-                // Render Sales Invoices
-                if (salesInvoices.length === 0) {
-                    salesTbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No sales invoices found</td></tr>';
+                // Sales Invoices Column Definitions
+                const salesColumnDefs = [
+                    { 
+                        field: 'invoice_number', 
+                        headerName: 'Invoice #',
+                        filter: 'agTextColumnFilter',
+                        sortable: true
+                    },
+                    { 
+                        field: 'invoice_date', 
+                        headerName: 'Date',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '-';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    },
+                    { 
+                        field: 'amount', 
+                        headerName: 'Amount',
+                        filter: 'agNumberColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (params.value === null || params.value === undefined) return '-';
+                            return `<span class="font-semibold">₹${Number(params.value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                        },
+                        type: 'numericColumn'
+                    },
+                    { 
+                        field: 'status', 
+                        headerName: 'Status',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            const status = params.value || '';
+                            const statusText = status === 'paid' ? 'PAID' : 'PENDING';
+                            // Clean, professional badge colors
+                            const badgeClass = status === 'paid' 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200';
+                            const title = status === 'paid' ? 'Payment received and reconciled' : 'Payment not yet received';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}" title="${title}">${escapeHtml(statusText)}</span>`;
+                        }
+                    },
+                    { 
+                        field: 'buyer_id', 
+                        headerName: 'Buyer',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            return params.value ? 'Buyer' : '-';
+                        }
+                    }
+                ];
+
+                // Purchase Invoices Column Definitions
+                const purchaseColumnDefs = [
+                    { 
+                        field: 'invoice_number', 
+                        headerName: 'Invoice #',
+                        filter: 'agTextColumnFilter',
+                        sortable: true
+                    },
+                    { 
+                        field: 'invoice_date', 
+                        headerName: 'Date',
+                        filter: 'agDateColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '-';
+                            return new Date(params.value).toLocaleDateString('en-IN', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        }
+                    },
+                    { 
+                        field: 'amount', 
+                        headerName: 'Amount',
+                        filter: 'agNumberColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (params.value === null || params.value === undefined) return '-';
+                            return `<span class="font-semibold">₹${Number(params.value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                        },
+                        type: 'numericColumn'
+                    },
+                    { 
+                        field: 'status', 
+                        headerName: 'Status',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            const status = params.value || '';
+                            const statusText = status === 'paid' ? 'PAID' : 'PENDING';
+                            // Clean, professional badge colors
+                            const badgeClass = status === 'paid' 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200';
+                            const title = status === 'paid' ? 'Payment made and reconciled' : 'Payment not yet made';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}" title="${title}">${escapeHtml(statusText)}</span>`;
+                        }
+                    },
+                    { 
+                        field: 'vendor_id', 
+                        headerName: 'Vendor',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            return params.value ? 'Vendor' : '-';
+                        }
+                    }
+                ];
+
+                // Initialize or update Sales grid with simpler configuration
+                if (!salesGridApi) {
+                    salesGridApi = window.agGridHelper.initAGGrid('sales-grid-container', salesColumnDefs, salesInvoices, {
+                        pagination: true,
+                        paginationPageSize: 25,
+                        suppressMenuHide: false,
+                        suppressColumnVirtualisation: true
+                    });
                 } else {
-                    salesTbodyEl.innerHTML = salesInvoices.map(inv => {
-                        const date = new Date(inv.invoice_date).toLocaleDateString('en-IN');
-                        const amount = `₹${inv.amount.toLocaleString('en-IN')}`;
-                        // For sales: PAID = Payment Received, PENDING = Awaiting Payment
-                        const statusText = inv.status === 'paid' ? 'Payment Received' : 'Awaiting Payment';
-                        const statusBadge = `<span class="badge badge-${inv.status}" title="${inv.status === 'paid' ? 'Payment received and reconciled with bank statement' : 'Payment not yet received'}">${statusText}</span>`;
-                        
-                        return `
-                            <tr>
-                                <td class="font-medium">${inv.invoice_number}</td>
-                                <td>${date}</td>
-                                <td class="font-semibold">${amount}</td>
-                                <td>${statusBadge}</td>
-                                <td>${inv.buyer_id ? 'Buyer' : '-'}</td>
-                            </tr>
-                        `;
-                    }).join('');
+                    window.agGridHelper.updateGridData(salesGridApi, salesInvoices);
+                }
+
+                // Initialize or update Purchase grid with simpler configuration
+                if (!purchaseGridApi) {
+                    purchaseGridApi = window.agGridHelper.initAGGrid('purchase-grid-container', purchaseColumnDefs, purchaseInvoices, {
+                        pagination: true,
+                        paginationPageSize: 25,
+                        suppressMenuHide: false,
+                        suppressColumnVirtualisation: true
+                    });
+                } else {
+                    window.agGridHelper.updateGridData(purchaseGridApi, purchaseInvoices);
                 }
                 
                 salesLoadingEl.classList.add('hidden');
                 salesErrorEl.classList.add('hidden');
-                salesTableContainer.classList.remove('hidden');
-                
-                // Render Purchase Invoices
-                if (purchaseInvoices.length === 0) {
-                    purchaseTbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No purchase invoices found</td></tr>';
-                } else {
-                    purchaseTbodyEl.innerHTML = purchaseInvoices.map(inv => {
-                        const date = new Date(inv.invoice_date).toLocaleDateString('en-IN');
-                        const amount = `₹${inv.amount.toLocaleString('en-IN')}`;
-                        // For purchase: PAID = Payment Made, PENDING = Awaiting Payment
-                        const statusText = inv.status === 'paid' ? 'Payment Made' : 'Awaiting Payment';
-                        const statusBadge = `<span class="badge badge-${inv.status}" title="${inv.status === 'paid' ? 'Payment made and reconciled with bank statement' : 'Payment not yet made'}">${statusText}</span>`;
-                        
-                        return `
-                            <tr>
-                                <td class="font-medium">${inv.invoice_number}</td>
-                                <td>${date}</td>
-                                <td class="font-semibold">${amount}</td>
-                                <td>${statusBadge}</td>
-                                <td>${inv.vendor_id ? 'Vendor' : '-'}</td>
-                            </tr>
-                        `;
-                    }).join('');
-                }
+                salesGridContainer.classList.remove('hidden');
                 
                 purchaseLoadingEl.classList.add('hidden');
                 purchaseErrorEl.classList.add('hidden');
-                purchaseTableContainer.classList.remove('hidden');
-                
+                purchaseGridContainer.classList.remove('hidden');
             } catch (error) {
                 salesLoadingEl.classList.add('hidden');
                 salesErrorEl.classList.remove('hidden');
@@ -217,6 +302,13 @@
                 purchaseErrorEl.classList.remove('hidden');
                 purchaseErrorEl.textContent = `Error loading invoices: ${error.message}`;
             }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '-';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         async function loadCompanyName() {
