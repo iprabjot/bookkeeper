@@ -51,6 +51,13 @@ class ReconciliationStatus(str, enum.Enum):
     SETTLED = "settled"
 
 
+class FileUploadStatus(str, enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class UserRole(str, enum.Enum):
     OWNER = "owner"
     ADMIN = "admin"
@@ -255,4 +262,25 @@ class Report(Base):
     
     # Relationships
     bundle = relationship("ReportBundle", back_populates="reports")
+
+
+class FileUpload(Base):
+    __tablename__ = "file_uploads"
+    
+    upload_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)  # Temporary storage path
+    file_type = Column(String, nullable=False)  # 'invoice' or 'bank_statement'
+    status = Column(SQLEnum(FileUploadStatus), default=FileUploadStatus.PENDING, nullable=False)
+    error_message = Column(String, nullable=True)  # Error details if processing failed
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True)  # Created invoice ID if successful
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    processed_at = Column(DateTime(timezone=True), nullable=True)  # When processing completed/failed
+    
+    # Relationships
+    company = relationship("Company")
+    user = relationship("User")
+    invoice = relationship("Invoice")
 
