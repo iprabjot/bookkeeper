@@ -1,5 +1,6 @@
 // API client for bookkeeper
-const API_BASE = 'http://localhost:8000/api';
+// Automatically detect API base URL (works for localhost and production)
+const API_BASE = window.location.origin + '/api';
 
 // Auth token management
 function getAccessToken() {
@@ -117,6 +118,29 @@ async function apiRequest(endpoint, options = {}) {
             }
         }
         
+        // Handle blob responses (for file downloads) - check before error handling
+        const contentType = response.headers.get('content-type') || '';
+        const isBlobRequest = options.responseType === 'blob' || 
+                              contentType.includes('application/zip') || 
+                              contentType.includes('text/csv') ||
+                              contentType.includes('application/octet-stream');
+        
+        if (isBlobRequest) {
+            if (!response.ok) {
+                // Try to get error message from JSON if available
+                try {
+                    const error = await response.json();
+                    throw new Error(error.detail || error.message || `HTTP ${response.status}`);
+                } catch (e) {
+                    if (e instanceof Error && e.message) {
+                        throw e;
+                    }
+                    throw new Error(`Download failed: ${response.statusText}`);
+                }
+            }
+            return await response.blob();
+        }
+        
         if (!response.ok) {
             let errorDetail = response.statusText;
             try {
@@ -130,7 +154,6 @@ async function apiRequest(endpoint, options = {}) {
             throw new Error(errorDetail || `HTTP ${response.status}`);
         }
         
-        const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             return await response.json();
         } else {
@@ -366,8 +389,35 @@ window.listBundles = listBundles;
 window.getBundle = getBundle;
 window.deleteBundle = deleteBundle;
 
-function downloadReport(endpoint, filename) {
-    window.open(`${API_BASE}${endpoint}`, '_blank');
+async function downloadReport(endpoint, filename) {
+    try {
+        // Use apiRequest which handles authentication automatically
+        const response = await apiRequest(endpoint, {
+            method: 'GET',
+            responseType: 'blob'
+        });
+        
+        if (response instanceof Blob) {
+            downloadBlob(response, filename);
+        } else {
+            // If apiRequest returns JSON error, handle it
+            throw new Error(response.detail || 'Failed to download report');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        alert(`Error downloading report: ${error.message || error}`);
+    }
+}
+
+function downloadBlob(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'report.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
 }
 
 // Make all API functions available globally
@@ -377,6 +427,8 @@ window.signup = signup;
 window.getCurrentUser = getCurrentUser;
 window.logout = logout;
 window.getStatus = getStatus;
+window.getAccessToken = getAccessToken;
+window.refreshAccessToken = refreshAccessToken;
 window.getCompanies = getCompanies;
 window.getCurrentCompany = getCurrentCompany;
 window.createCompany = createCompany;
