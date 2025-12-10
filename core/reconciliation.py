@@ -124,7 +124,7 @@ def reconcile_transactions(company_id: int = None) -> Dict:
         pending_recons = db.query(Reconciliation).join(
             BankTransaction, Reconciliation.transaction_id == BankTransaction.transaction_id
         ).filter(
-            BankTransaction.company_id == current_company.company_id,
+            BankTransaction.company_id == company_id,
             Reconciliation.status == ReconciliationStatus.PENDING
         ).all()
         
