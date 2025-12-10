@@ -6,6 +6,7 @@ This folder contains all project documentation.
 
 - **`README.md`**: Project overview and quick start guide
 - **`SETUP.md`**: Detailed setup instructions
+- **`DEPLOYMENT_OPTIONS.md`**: Free and low-cost deployment platforms (Railway, Render, AWS Lightsail, Fly.io)
 - **`DEPLOYMENT_PLAN.md`**: Docker deployment strategy
 - **`REPORT_STORAGE.md`**: Database-backed report storage system
 

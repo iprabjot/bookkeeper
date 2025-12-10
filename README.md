@@ -202,6 +202,7 @@ See [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) for detailed deployment i
 Comprehensive documentation is available in the [`docs/`](docs/) folder:
 
 - **[Setup Guide](docs/SETUP.md)**: Detailed setup instructions
+- **[Deployment Options](docs/DEPLOYMENT_OPTIONS.md)**: Free and low-cost deployment platforms (Railway, Render, AWS Lightsail, Fly.io)
 - **[Deployment Plan](docs/DEPLOYMENT_PLAN.md)**: Docker deployment strategy
 - **[Authentication Guide](docs/AUTH_COMPLETE.md)**: User authentication and management
 - **[Database Migrations](docs/ALEMBIC_SETUP.md)**: Alembic migration guide
