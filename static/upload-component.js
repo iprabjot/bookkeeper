@@ -42,102 +42,106 @@ class FileUploadComponent {
 
     render() {
         this.container.innerHTML = `
-            <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
-                <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                    <i class="fas fa-cloud-upload-alt text-blue-600 mr-3"></i>
-                    ${this.config.uploadText}
-                </h3>
-                
-                <!-- Upload Area -->
-                <div class="upload-area relative" id="${this.config.containerId}-upload-area">
-                    <input 
-                        type="file" 
-                        id="${this.config.containerId}-file-input" 
-                        accept="${this.config.accept}" 
-                        ${this.config.multiple ? 'multiple' : ''}
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;"
-                    >
-                    <div class="text-center py-8" style="position: relative; z-index: 1; pointer-events: none;">
-                        <div class="mb-6">
-                            <i class="fas fa-cloud-upload-alt text-6xl text-blue-400 mb-4"></i>
-                        </div>
-                        <p class="text-lg font-semibold text-gray-700 mb-2">${this.config.dragText}</p>
-                        <p class="text-sm text-gray-500 mb-6">${this.config.helpText}</p>
-                        <button 
-                            type="button" 
-                            id="${this.config.containerId}-browse-btn"
-                            class="inline-flex items-center px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors duration-200 shadow-sm hover:shadow"
-                            style="pointer-events: auto; position: relative; z-index: 20;"
-                        >
-                            <i class="fas fa-folder-open mr-2"></i>Browse Files
-                        </button>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <!-- Accordion Header -->
+                <button 
+                    type="button"
+                    id="${this.config.containerId}-accordion-toggle"
+                    class="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                >
+                    <div class="flex items-center">
+                        <i class="fas fa-cloud-upload-alt text-blue-600 mr-3"></i>
+                        <span class="font-semibold text-gray-900">${this.config.uploadText}</span>
+                        <span id="${this.config.containerId}-file-badge" class="ml-3 hidden bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"></span>
                     </div>
-                </div>
+                    <i id="${this.config.containerId}-accordion-icon" class="fas fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
 
-                <!-- Selected Files Display -->
-                <div id="${this.config.containerId}-files-list" class="hidden mt-6">
-                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-5 shadow-sm">
-                        <div class="flex items-center justify-between mb-4">
-                            <h4 class="font-semibold text-gray-900 flex items-center">
-                                <i class="fas fa-file-check text-blue-600 mr-2"></i>
-                                Selected Files
-                            </h4>
-                            <button 
-                                type="button"
-                                id="${this.config.containerId}-clear-btn"
-                                class="text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors duration-200"
+                <!-- Accordion Content (Collapsible) -->
+                <div id="${this.config.containerId}-accordion-content" class="hidden border-t border-gray-200">
+                    <div class="p-6">
+                        <!-- Upload Area -->
+                        <div class="upload-area relative border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors" id="${this.config.containerId}-upload-area">
+                            <input 
+                                type="file" 
+                                id="${this.config.containerId}-file-input" 
+                                accept="${this.config.accept}" 
+                                ${this.config.multiple ? 'multiple' : ''}
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;"
                             >
-                                <i class="fas fa-times mr-1"></i>Clear All
-                            </button>
-                        </div>
-                        <div id="${this.config.containerId}-files-list-items" class="space-y-2 max-h-64 overflow-y-auto"></div>
-                    </div>
-                </div>
-
-                <!-- Upload Button (Hidden until files selected) -->
-                <div id="${this.config.containerId}-upload-section" class="hidden mt-6">
-                    <div class="flex items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-4 shadow-lg">
-                        <div class="flex items-center text-white">
-                            <i class="fas fa-upload mr-3 text-xl"></i>
-                            <div>
-                                <p class="font-semibold">Ready to Upload</p>
-                                <p id="${this.config.containerId}-file-count" class="text-sm text-blue-100"></p>
+                            <div class="text-center py-12" style="position: relative; z-index: 1; pointer-events: none;">
+                                <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 mb-4"></i>
+                                <p class="text-sm font-medium text-gray-700 mb-1">${this.config.dragText}</p>
+                                <p class="text-xs text-gray-500 mb-4">${this.config.helpText}</p>
+                                <button 
+                                    type="button" 
+                                    id="${this.config.containerId}-browse-btn"
+                                    class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                                    style="pointer-events: auto; position: relative; z-index: 20;"
+                                >
+                                    <i class="fas fa-folder-open mr-2"></i>Browse
+                                </button>
                             </div>
                         </div>
-                        <button 
-                            id="${this.config.containerId}-upload-btn"
-                            type="button"
-                            class="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                            disabled
-                        >
-                            <i class="fas fa-paper-plane mr-2"></i>Upload Files
-                        </button>
+
+                        <!-- Selected Files Display (Compact) -->
+                        <div id="${this.config.containerId}-files-list" class="hidden mt-4">
+                            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                                <div class="bg-gray-50 px-4 py-2 flex items-center justify-between border-b border-gray-200">
+                                    <span class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-file mr-2"></i>
+                                        <span id="${this.config.containerId}-files-count">0</span> file(s)
+                                    </span>
+                                    <button 
+                                        type="button"
+                                        id="${this.config.containerId}-clear-btn"
+                                        class="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                    >
+                                        <i class="fas fa-times mr-1"></i>Clear
+                                    </button>
+                                </div>
+                                <div id="${this.config.containerId}-files-list-items" class="divide-y divide-gray-200 max-h-80 overflow-y-auto"></div>
+                            </div>
+                        </div>
+
+                        <!-- Upload Button (Compact) -->
+                        <div id="${this.config.containerId}-upload-section" class="hidden mt-4">
+                            <button 
+                                id="${this.config.containerId}-upload-btn"
+                                type="button"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                disabled
+                            >
+                                <i class="fas fa-upload mr-2"></i>
+                                <span>Upload <span id="${this.config.containerId}-file-count-text">0</span> file(s)</span>
+                            </button>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div id="${this.config.containerId}-progress" class="upload-progress hidden mt-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span id="${this.config.containerId}-progress-text" class="text-xs font-medium text-gray-700">Processing...</span>
+                                <span id="${this.config.containerId}-progress-percent" class="text-xs font-medium text-gray-700">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="${this.config.containerId}-progress-fill" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Message Display -->
+                        <div id="${this.config.containerId}-message" class="mt-4"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Progress Bar -->
-                <div id="${this.config.containerId}-progress" class="upload-progress hidden mt-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span id="${this.config.containerId}-progress-text" class="text-sm font-medium text-gray-700">Processing...</span>
-                        <span id="${this.config.containerId}-progress-percent" class="text-sm font-medium text-gray-700">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div id="${this.config.containerId}-progress-fill" class="progress-fill" style="width: 0%"></div>
-                    </div>
+            <!-- Loading Overlay (Modal) -->
+            <div id="${this.config.containerId}-loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                <div class="bg-white rounded-lg p-8 max-w-md mx-4 text-center shadow-xl">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Processing Files</h3>
+                    <p id="${this.config.containerId}-loading-text" class="text-gray-600 mb-4">Please wait...</p>
+                    <div id="${this.config.containerId}-loading-details" class="text-sm text-gray-500"></div>
                 </div>
-
-                <!-- Loading Overlay -->
-                <div id="${this.config.containerId}-loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-                    <div class="bg-white rounded-lg p-8 max-w-md mx-4 text-center">
-                        <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Uploading Files</h3>
-                        <p id="${this.config.containerId}-loading-text" class="text-gray-600 mb-4">Please wait while we process your files...</p>
-                        <div id="${this.config.containerId}-loading-details" class="text-sm text-gray-500"></div>
-                    </div>
-                </div>
-
-                <!-- Message Display -->
-                <div id="${this.config.containerId}-message" class="mt-4"></div>
             </div>
         `;
 
@@ -226,8 +230,56 @@ class FileUploadComponent {
             }
         });
 
+        // Accordion toggle
+        const accordionToggle = document.getElementById(`${this.config.containerId}-accordion-toggle`);
+        if (accordionToggle) {
+            accordionToggle.addEventListener('click', () => {
+                this.toggleAccordion();
+            });
+        }
+
         // Mark listeners as attached
         this.listenersAttached = true;
+    }
+
+    toggleAccordion() {
+        const content = document.getElementById(`${this.config.containerId}-accordion-content`);
+        const icon = document.getElementById(`${this.config.containerId}-accordion-icon`);
+        
+        if (content && icon) {
+            const isHidden = content.classList.contains('hidden');
+            if (isHidden) {
+                content.classList.remove('hidden');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+    }
+
+    expandAccordion() {
+        const content = document.getElementById(`${this.config.containerId}-accordion-content`);
+        const icon = document.getElementById(`${this.config.containerId}-accordion-icon`);
+        
+        if (content && icon) {
+            content.classList.remove('hidden');
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
+    }
+
+    collapseAccordion() {
+        const content = document.getElementById(`${this.config.containerId}-accordion-content`);
+        const icon = document.getElementById(`${this.config.containerId}-accordion-icon`);
+        
+        if (content && icon) {
+            content.classList.add('hidden');
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
     }
 
     handleFileSelection(files) {
@@ -289,36 +341,70 @@ class FileUploadComponent {
         if (this.selectedFiles.length === 0) {
             filesListContainer.classList.add('hidden');
             uploadSection.classList.add('hidden');
+            const fileBadge = document.getElementById(`${this.config.containerId}-file-badge`);
+            if (fileBadge) fileBadge.classList.add('hidden');
             return;
         }
 
         filesListContainer.classList.remove('hidden');
         uploadSection.classList.remove('hidden');
-        fileCount.textContent = `${this.selectedFiles.length} file${this.selectedFiles.length > 1 ? 's' : ''} selected`;
+        
+        // Update file count in multiple places
+        const fileCountText = document.getElementById(`${this.config.containerId}-file-count-text`);
+        const filesCount = document.getElementById(`${this.config.containerId}-files-count`);
+        const fileBadge = document.getElementById(`${this.config.containerId}-file-badge`);
+        
+        const countText = `${this.selectedFiles.length} file${this.selectedFiles.length > 1 ? 's' : ''}`;
+        if (fileCountText) fileCountText.textContent = this.selectedFiles.length;
+        if (filesCount) filesCount.textContent = this.selectedFiles.length;
+        if (fileBadge) {
+            fileBadge.textContent = this.selectedFiles.length;
+            fileBadge.classList.remove('hidden');
+        }
+        
+        // Expand accordion if files are selected
+        this.expandAccordion();
 
-        filesListItems.innerHTML = this.selectedFiles.map((file, index) => `
-            <div class="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-200 shadow-sm hover:shadow-md transition-shadow duration-200" data-file-index="${index}">
+        filesListItems.innerHTML = this.selectedFiles.map((file, index) => {
+            // Check if this file has an error status
+            const fileStatus = this.uploadStatuses.get(index);
+            const hasError = fileStatus && fileStatus.status === 'failed';
+            const hasSuccess = fileStatus && fileStatus.status === 'completed';
+            
+            let statusClass = 'bg-white';
+            let iconClass = 'text-blue-600';
+            if (hasError) {
+                statusClass = 'bg-red-50';
+                iconClass = 'text-red-600';
+            } else if (hasSuccess) {
+                statusClass = 'bg-green-50';
+                iconClass = 'text-green-600';
+            }
+            
+            return `
+            <div class="flex items-center justify-between ${statusClass} px-4 py-3 hover:bg-gray-50 transition-colors" data-file-index="${index}">
                 <div class="flex items-center space-x-3 flex-1 min-w-0">
-                    <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center file-status-icon">
-                        <i class="fas fa-file-pdf text-blue-600"></i>
+                    <div class="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center file-status-icon">
+                        <i class="fas ${hasError ? 'fa-exclamation-circle' : hasSuccess ? 'fa-check-circle' : 'fa-file-pdf'} ${iconClass} text-sm"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 truncate">${this.escapeHtml(file.name)}</p>
-                        <p class="text-xs text-gray-500 mt-0.5">${this.formatFileSize(file.size)}</p>
+                        <p class="text-sm font-medium text-gray-900 truncate">${this.escapeHtml(file.name)}</p>
+                        <p class="text-xs text-gray-500 mt-0.5 file-size">${this.formatFileSize(file.size)}</p>
                     </div>
                 </div>
                 ${this.config.multiple ? `
                     <button 
                         type="button"
                         data-file-index="${index}"
-                        class="remove-file-btn text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg ml-2 flex-shrink-0 transition-colors duration-200"
-                        title="Remove file"
+                        class="remove-file-btn text-gray-400 hover:text-red-600 p-1.5 rounded transition-colors"
+                        title="Remove"
                     >
-                        <i class="fas fa-times"></i>
+                        <i class="fas fa-times text-xs"></i>
                     </button>
                 ` : ''}
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Attach event listeners to remove buttons
         if (this.config.multiple) {
@@ -354,10 +440,12 @@ class FileUploadComponent {
         const filesListContainer = document.getElementById(`${this.config.containerId}-files-list`);
         const uploadSection = document.getElementById(`${this.config.containerId}-upload-section`);
         const messageEl = document.getElementById(`${this.config.containerId}-message`);
+        const fileBadge = document.getElementById(`${this.config.containerId}-file-badge`);
         
         if (filesListContainer) filesListContainer.classList.add('hidden');
         if (uploadSection) uploadSection.classList.add('hidden');
         if (messageEl) messageEl.innerHTML = '';
+        if (fileBadge) fileBadge.classList.add('hidden');
         
         this.updateFilesDisplay();
         this.updateUploadButton();
@@ -373,7 +461,14 @@ class FileUploadComponent {
 
         this.isUploading = true;
         this.updateUploadButton();
-        this.showLoadingOverlay();
+        
+        // Hide upload button once upload starts
+        const uploadSection = document.getElementById(`${this.config.containerId}-upload-section`);
+        if (uploadSection) {
+            uploadSection.classList.add('hidden');
+        }
+        
+        // Show progress section
         this.showProgress();
 
         const progressFill = document.getElementById(`${this.config.containerId}-progress-fill`);
@@ -476,11 +571,46 @@ class FileUploadComponent {
                             if (statusIcon) {
                                 statusIcon.innerHTML = '<i class="fas fa-exclamation-circle text-red-600"></i>';
                             }
-                            // Add error message to file element
+                            
+                            // Remove existing error message if any
+                            const existingError = fileElement.querySelector('.file-error-message');
+                            if (existingError) {
+                                existingError.remove();
+                            }
+                            
+                            // Add error message to file element with better formatting
                             const errorDiv = document.createElement('div');
-                            errorDiv.className = 'text-xs text-red-600 mt-1';
-                            errorDiv.textContent = errorMsg;
-                            fileElement.appendChild(errorDiv);
+                            errorDiv.className = 'file-error-message mt-2 px-3 py-2 bg-red-50 border-l-2 border-red-400 rounded';
+                            
+                            // Format error message more compactly
+                            let shortMessage = errorMsg;
+                            const isCompanyError = errorMsg.includes('does not appear to belong to your company');
+                            
+                            if (isCompanyError) {
+                                // Extract company name from error message
+                                const companyMatch = errorMsg.match(/\(([^)]+)\)/);
+                                const companyName = companyMatch ? companyMatch[1] : 'your company';
+                                shortMessage = `Invoice does not belong to ${companyName}. Must mention company name or GSTIN.`;
+                            } else if (errorMsg.length > 120) {
+                                shortMessage = errorMsg.substring(0, 120) + '...';
+                            }
+                            
+                            errorDiv.innerHTML = `
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0 text-xs"></i>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-medium text-red-800 leading-relaxed">${this.escapeHtml(shortMessage)}</p>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            // Find the file info container and insert error after file size
+                            const fileInfoContainer = fileElement.querySelector('.flex-1.min-w-0');
+                            if (fileInfoContainer) {
+                                fileInfoContainer.appendChild(errorDiv);
+                            } else {
+                                fileElement.appendChild(errorDiv);
+                            }
                         }
                         
                         console.error(`Failed to upload ${file.name}:`, error);
@@ -526,6 +656,8 @@ class FileUploadComponent {
                     'info',
                     true
                 );
+                // Hide loading overlay for bulk uploads (processing happens in background)
+                this.hideLoadingOverlay();
             }
 
             // Show detailed errors if any
@@ -543,14 +675,22 @@ class FileUploadComponent {
                 true
             );
         } finally {
-            this.isUploading = false;
-            this.hideLoadingOverlay();
-            this.updateUploadButton();
+            // Only reset isUploading if not using bulk upload (bulk uploads continue processing in background)
+            const useBulkUpload = this.config.useBulkUpload !== false && window.uploadMultipleInvoices;
+            if (!useBulkUpload) {
+                this.isUploading = false;
+                this.hideLoadingOverlay();
+                this.updateUploadButton();
+            }
+            // For bulk uploads, isUploading stays true until polling completes
+            // Upload button stays hidden - files are processing in background
 
-            // Hide progress after delay
-            setTimeout(() => {
-                this.hideProgress();
-            }, 3000);
+            // Hide progress after delay (only for sequential uploads)
+            if (!useBulkUpload) {
+                setTimeout(() => {
+                    this.hideProgress();
+                }, 3000);
+            }
         }
     }
 
@@ -671,10 +811,45 @@ class FileUploadComponent {
                                         fileElement.classList.remove('opacity-75');
                                         fileElement.classList.add('border-red-300', 'bg-red-50');
                                         if (errorMessage) {
+                                            // Remove existing error message if any
+                                            const existingError = fileElement.querySelector('.file-error-message');
+                                            if (existingError) {
+                                                existingError.remove();
+                                            }
+                                            
+                                            // Create error message with better formatting
                                             const errorDiv = document.createElement('div');
-                                            errorDiv.className = 'text-xs text-red-600 mt-1';
-                                            errorDiv.textContent = errorMessage;
-                                            fileElement.appendChild(errorDiv);
+                                            errorDiv.className = 'file-error-message mt-2 px-3 py-2 bg-red-50 border-l-2 border-red-400 rounded';
+                                            
+                                            // Format error message more compactly
+                                            let shortMessage = errorMessage;
+                                            const isCompanyError = errorMessage.includes('does not appear to belong to your company');
+                                            
+                                            if (isCompanyError) {
+                                                // Extract company name from error message
+                                                const companyMatch = errorMessage.match(/\(([^)]+)\)/);
+                                                const companyName = companyMatch ? companyMatch[1] : 'your company';
+                                                shortMessage = `Invoice does not belong to ${companyName}. Must mention company name or GSTIN.`;
+                                            } else if (errorMessage.length > 120) {
+                                                shortMessage = errorMessage.substring(0, 120) + '...';
+                                            }
+                                            
+                                            errorDiv.innerHTML = `
+                                                <div class="flex items-start gap-2">
+                                                    <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0 text-xs"></i>
+                                                    <div class="flex-1 min-w-0">
+                                                        <p class="text-xs font-medium text-red-800 leading-relaxed">${this.escapeHtml(shortMessage)}</p>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            
+                                            // Find the file info container and insert error after file size
+                                            const fileInfoContainer = fileElement.querySelector('.flex-1.min-w-0');
+                                            if (fileInfoContainer) {
+                                                fileInfoContainer.appendChild(errorDiv);
+                                            } else {
+                                                fileElement.appendChild(errorDiv);
+                                            }
                                         }
                                     } else if (newStatus === 'processing') {
                                         statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-600"></i>';
@@ -722,7 +897,8 @@ class FileUploadComponent {
                 this.hideLoadingOverlay();
                 this.hideProgress();
                 this.isUploading = false;
-                this.updateUploadButton();
+                // Don't show upload button again - files are done processing
+                // Upload button will only show again if user selects new files
 
                 if (currentFailed === 0) {
                     this.showMessage(
