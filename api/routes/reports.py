@@ -2,6 +2,8 @@
 Report generation routes - Database-backed report management
 """
 import logging
+import zipfile
+import io
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import Response
 from database.db import get_db
@@ -11,11 +13,26 @@ from database.models import (
 )
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def encode_filename_for_header(filename: str) -> str:
+    """
+    Encode filename for Content-Disposition header.
+    Uses RFC 2231 encoding for Unicode characters.
+    """
+    try:
+        # Try to encode as ASCII first (simple case)
+        filename.encode('ascii')
+        return f'filename="{filename}"'
+    except UnicodeEncodeError:
+        # Use RFC 2231 encoding for Unicode characters
+        encoded = quote(filename, safe='')
+        return f"filename*=UTF-8''{encoded}"
 
 
 def get_latest_bundle(db: Session, company_id: int) -> Optional[ReportBundle]:
@@ -74,7 +91,7 @@ async def get_bundle(
             "account_name": report.account_name,
             "filename": report.filename,
             "size_bytes": report.size_bytes,
-            "download_url": f"/api/reports/{report.report_id}/download"
+            "download_url": f"/reports/{report.report_id}/download"
         })
     
     return {
@@ -107,7 +124,7 @@ async def download_report(
         content=report.content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="{report.filename}"'
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
         }
     )
 
@@ -148,7 +165,7 @@ async def get_journal_entries_csv(
         content=report.content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="{report.filename}"'
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
         }
     )
 
@@ -189,7 +206,7 @@ async def get_trial_balance_csv(
         content=report.content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="{report.filename}"'
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
         }
     )
 
@@ -234,7 +251,7 @@ async def get_ledger_csv(
         content=report.content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="{report.filename}"'
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
         }
     )
 
@@ -269,6 +286,7 @@ async def list_reports(
                 "name": "Journal Entries",
                 "type": "standard",
                 "endpoint": f"/api/reports/journal-entries?bundle_id={bundle.bundle_id}",
+                "download_url": f"/reports/{report.report_id}/download",
                 "filename": report.filename
             })
         elif report_type_str == "trial_balance":
@@ -276,6 +294,7 @@ async def list_reports(
                 "name": "Trial Balance",
                 "type": "standard",
                 "endpoint": f"/api/reports/trial-balance?bundle_id={bundle.bundle_id}",
+                "download_url": f"/reports/{report.report_id}/download",
                 "filename": report.filename
             })
         elif report_type_str == "ledger":
@@ -285,6 +304,7 @@ async def list_reports(
                 "name": report.account_name,
                 "type": "ledger",
                 "endpoint": f"/api/reports/ledger/{encoded_name}?bundle_id={bundle.bundle_id}",
+                "download_url": f"/reports/{report.report_id}/download",
                 "filename": report.filename
             })
     
@@ -331,6 +351,46 @@ async def generate_reports(
             status_code=500,
             detail="Failed to generate reports. Please try again later or contact support."
         )
+
+
+@router.get("/reports/bundles/{bundle_id}/download-zip")
+async def download_bundle_zip(
+    bundle_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download all reports in a bundle as a ZIP file"""
+    bundle = db.query(ReportBundle).filter(
+        ReportBundle.bundle_id == bundle_id,
+        ReportBundle.company_id == current_user.company_id
+    ).first()
+    
+    if not bundle:
+        raise HTTPException(status_code=404, detail="Report bundle not found")
+    
+    if not bundle.reports:
+        raise HTTPException(status_code=404, detail="No reports found in this bundle")
+    
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for report in bundle.reports:
+            # Add each report to the ZIP
+            zip_file.writestr(report.filename, report.content)
+    
+    zip_buffer.seek(0)
+    
+    # Generate filename with bundle info
+    date_str = bundle.generated_at.strftime("%Y%m%d_%H%M%S")
+    zip_filename = f"reports_bundle_{bundle_id}_{date_str}.zip"
+    
+    return Response(
+        content=zip_buffer.read(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; {encode_filename_for_header(zip_filename)}'
+        }
+    )
 
 
 @router.delete("/reports/bundles/{bundle_id}")
