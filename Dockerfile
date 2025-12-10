@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     poppler-utils \
     tesseract-ocr \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
@@ -42,10 +43,10 @@ RUN mkdir -p uploads reports data
 # Expose port
 EXPOSE 8000
 
-# Health check
+# Health check (using curl instead of requests to avoid extra dependency)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/health')" || exit 1
+    CMD curl -f http://localhost:8000/api/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+# Run migrations and start the application
+# Railway sets PORT environment variable, fallback to 8000 for local development
+CMD sh -c "alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
