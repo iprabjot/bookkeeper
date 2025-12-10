@@ -232,3 +232,30 @@ class UpdateUserRequest(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
 
+
+# File Upload schemas
+class FileUploadStatusEnum(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class FileUploadResponse(BaseModel):
+    upload_id: int
+    filename: str
+    file_type: str
+    status: FileUploadStatusEnum
+    error_message: Optional[str]
+    invoice_id: Optional[int]
+    created_at: datetime
+    processed_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+
+class BulkUploadResponse(BaseModel):
+    upload_ids: List[int]
+    message: str
+
