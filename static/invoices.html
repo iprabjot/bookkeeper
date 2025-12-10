@@ -25,58 +25,77 @@
 
             <main class="flex-1 overflow-y-auto p-6">
                 <!-- Upload Section -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload Invoices</h3>
-                    <div class="upload-area" onclick="document.getElementById('invoice-files').click()">
-                        <input type="file" id="invoice-files" accept=".pdf" multiple onchange="handleInvoiceUpload(event)">
-                        <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 mb-4"></i>
-                        <p class="text-lg font-medium text-gray-700">Click to select or drag & drop PDF invoices</p>
-                        <p class="text-sm text-gray-500 mt-2">You can select multiple files at once</p>
-                    </div>
-                    <div id="upload-progress" class="upload-progress hidden mt-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-gray-700">Processing...</span>
-                            <span class="text-sm text-gray-500" id="progress-text">0/0</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                    </div>
-                    <div id="upload-message" class="mt-4"></div>
-                </div>
+                <div id="invoice-upload-component"></div>
 
                 <!-- Invoices List -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900">All Invoices</h3>
-                        <button onclick="loadInvoices()" class="btn-secondary">
-                            <i class="fas fa-sync-alt mr-2"></i>Refresh
-                        </button>
-                    </div>
-                    
-                    <div id="invoices-loading" class="flex items-center justify-center h-32">
-                        <div class="text-center">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                            <p class="text-sm text-gray-500">Loading invoices...</p>
+                <div class="space-y-6">
+                    <!-- Sales Invoices Section -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-arrow-up text-green-600 mr-2"></i>Sales Invoices
+                            </h3>
+                            <button onclick="loadInvoices()" class="btn-secondary">
+                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                            </button>
+                        </div>
+                        
+                        <div id="sales-loading" class="flex items-center justify-center h-32">
+                            <div class="text-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                <p class="text-sm text-gray-500">Loading invoices...</p>
+                            </div>
+                        </div>
+                        
+                        <div id="sales-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
+                        
+                        <div class="table-container hidden" id="sales-table-container">
+                            <table id="sales-table">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Buyer</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sales-tbody"></tbody>
+                            </table>
                         </div>
                     </div>
-                    
-                    <div id="invoices-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
-                    
-                    <div class="table-container hidden" id="invoices-table-container">
-                        <table id="invoices-table">
-                            <thead>
-                                <tr>
-                                    <th>Invoice #</th>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th>Vendor/Buyer</th>
-                                </tr>
-                            </thead>
-                            <tbody id="invoices-tbody"></tbody>
-                        </table>
+
+                    <!-- Purchase Invoices Section -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-arrow-down text-orange-600 mr-2"></i>Purchase Invoices
+                            </h3>
+                        </div>
+                        
+                        <div id="purchase-loading" class="flex items-center justify-center h-32">
+                            <div class="text-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                <p class="text-sm text-gray-500">Loading invoices...</p>
+                            </div>
+                        </div>
+                        
+                        <div id="purchase-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"></div>
+                        
+                        <div class="table-container hidden" id="purchase-table-container">
+                            <table id="purchase-table">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Vendor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchase-tbody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -85,126 +104,120 @@
 
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
+    <script src="/static/upload-component.js"></script>
     <script>
-        let uploadQueue = [];
-        let processing = false;
-
-        async function handleInvoiceUpload(event) {
-            const files = Array.from(event.target.files);
-            if (files.length === 0) return;
-            
-            uploadQueue = files;
-            processQueue();
-        }
-
-        async function processQueue() {
-            if (processing || uploadQueue.length === 0) return;
-            
-            processing = true;
-            const progressEl = document.getElementById('upload-progress');
-            const progressFill = document.getElementById('progress-fill');
-            const progressText = document.getElementById('progress-text');
-            const messageEl = document.getElementById('upload-message');
-            
-            progressEl.classList.remove('hidden');
-            messageEl.innerHTML = '';
-            
-            let processed = 0;
-            const total = uploadQueue.length;
-            const results = { success: 0, failed: 0 };
-            
-            for (const file of uploadQueue) {
-                try {
+        // Initialize invoice upload component
+        let invoiceUploadComponent;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            invoiceUploadComponent = new FileUploadComponent({
+                containerId: 'invoice-upload-component',
+                accept: '.pdf',
+                multiple: true,
+                uploadText: 'Upload Invoices',
+                dragText: 'Click to select or drag & drop PDF invoices',
+                helpText: 'You can select multiple files at once',
+                useBulkUpload: true, // Use async bulk upload API
+                onUpload: async (file) => {
+                    // Fallback for single file uploads
                     await window.uploadInvoice(file);
-                    results.success++;
-                } catch (error) {
-                    results.failed++;
-                    console.error(`Failed to upload ${file.name}:`, error);
+                    setTimeout(() => {
+                        loadInvoices();
+                    }, 500);
+                },
+                onComplete: () => {
+                    // Reload invoices when processing completes
+                    loadInvoices();
                 }
-                
-                processed++;
-                const percent = (processed / total) * 100;
-                progressFill.style.width = `${percent}%`;
-                progressText.textContent = `${processed}/${total}`;
-            }
+            });
             
-            messageEl.innerHTML = `
-                <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                     Uploaded ${results.success} invoice(s) successfully${results.failed > 0 ? `, ${results.failed} failed` : ''}
-                </div>
-            `;
-            
-            uploadQueue = [];
-            processing = false;
-            
-            setTimeout(() => {
-                progressEl.classList.add('hidden');
-                progressFill.style.width = '0%';
-                loadInvoices();
-            }, 2000);
-        }
+            initSidebar('invoices.html');
+            loadCompanyName();
+            loadInvoices();
+        });
 
         async function loadInvoices() {
-            const loadingEl = document.getElementById('invoices-loading');
-            const errorEl = document.getElementById('invoices-error');
-            const tableContainer = document.getElementById('invoices-table-container');
-            const tbodyEl = document.getElementById('invoices-tbody');
+            const salesLoadingEl = document.getElementById('sales-loading');
+            const salesErrorEl = document.getElementById('sales-error');
+            const salesTableContainer = document.getElementById('sales-table-container');
+            const salesTbodyEl = document.getElementById('sales-tbody');
+            
+            const purchaseLoadingEl = document.getElementById('purchase-loading');
+            const purchaseErrorEl = document.getElementById('purchase-error');
+            const purchaseTableContainer = document.getElementById('purchase-table-container');
+            const purchaseTbodyEl = document.getElementById('purchase-tbody');
             
             try {
                 const invoices = await window.getInvoices();
                 
-                if (invoices.length === 0) {
-                    tbodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No invoices found</td></tr>';
+                // Separate invoices by type
+                const salesInvoices = invoices.filter(inv => inv.invoice_type === 'sales');
+                const purchaseInvoices = invoices.filter(inv => inv.invoice_type === 'purchase');
+                
+                // Render Sales Invoices
+                if (salesInvoices.length === 0) {
+                    salesTbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No sales invoices found</td></tr>';
                 } else {
-                    tbodyEl.innerHTML = invoices.map(inv => {
+                    salesTbodyEl.innerHTML = salesInvoices.map(inv => {
                         const date = new Date(inv.invoice_date).toLocaleDateString('en-IN');
                         const amount = `₹${inv.amount.toLocaleString('en-IN')}`;
-                        const typeBadge = `<span class="badge badge-${inv.invoice_type}">${inv.invoice_type}</span>`;
-                        const statusBadge = `<span class="badge badge-${inv.status}">${inv.status}</span>`;
+                        // For sales: PAID = Payment Received, PENDING = Awaiting Payment
+                        const statusText = inv.status === 'paid' ? 'Payment Received' : 'Awaiting Payment';
+                        const statusBadge = `<span class="badge badge-${inv.status}" title="${inv.status === 'paid' ? 'Payment received and reconciled with bank statement' : 'Payment not yet received'}">${statusText}</span>`;
                         
                         return `
                             <tr>
                                 <td class="font-medium">${inv.invoice_number}</td>
                                 <td>${date}</td>
-                                <td>${typeBadge}</td>
                                 <td class="font-semibold">${amount}</td>
                                 <td>${statusBadge}</td>
-                                <td>${inv.vendor_id ? 'Vendor' : inv.buyer_id ? 'Buyer' : '-'}</td>
+                                <td>${inv.buyer_id ? 'Buyer' : '-'}</td>
                             </tr>
                         `;
                     }).join('');
                 }
                 
-                loadingEl.classList.add('hidden');
-                errorEl.classList.add('hidden');
-                tableContainer.classList.remove('hidden');
+                salesLoadingEl.classList.add('hidden');
+                salesErrorEl.classList.add('hidden');
+                salesTableContainer.classList.remove('hidden');
+                
+                // Render Purchase Invoices
+                if (purchaseInvoices.length === 0) {
+                    purchaseTbodyEl.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">No purchase invoices found</td></tr>';
+                } else {
+                    purchaseTbodyEl.innerHTML = purchaseInvoices.map(inv => {
+                        const date = new Date(inv.invoice_date).toLocaleDateString('en-IN');
+                        const amount = `₹${inv.amount.toLocaleString('en-IN')}`;
+                        // For purchase: PAID = Payment Made, PENDING = Awaiting Payment
+                        const statusText = inv.status === 'paid' ? 'Payment Made' : 'Awaiting Payment';
+                        const statusBadge = `<span class="badge badge-${inv.status}" title="${inv.status === 'paid' ? 'Payment made and reconciled with bank statement' : 'Payment not yet made'}">${statusText}</span>`;
+                        
+                        return `
+                            <tr>
+                                <td class="font-medium">${inv.invoice_number}</td>
+                                <td>${date}</td>
+                                <td class="font-semibold">${amount}</td>
+                                <td>${statusBadge}</td>
+                                <td>${inv.vendor_id ? 'Vendor' : '-'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+                
+                purchaseLoadingEl.classList.add('hidden');
+                purchaseErrorEl.classList.add('hidden');
+                purchaseTableContainer.classList.remove('hidden');
+                
             } catch (error) {
-                loadingEl.classList.add('hidden');
-                errorEl.classList.remove('hidden');
-                errorEl.textContent = `Error loading invoices: ${error.message}`;
+                salesLoadingEl.classList.add('hidden');
+                salesErrorEl.classList.remove('hidden');
+                salesErrorEl.textContent = `Error loading invoices: ${error.message}`;
+                
+                purchaseLoadingEl.classList.add('hidden');
+                purchaseErrorEl.classList.remove('hidden');
+                purchaseErrorEl.textContent = `Error loading invoices: ${error.message}`;
             }
         }
-
-        // Drag and drop
-        const uploadArea = document.querySelector('.upload-area');
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-            if (files.length > 0) {
-                uploadQueue = files;
-                processQueue();
-            }
-        });
 
         async function loadCompanyName() {
             try {
@@ -214,12 +227,6 @@
                 document.getElementById('company-name-nav').textContent = 'No company set';
             }
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            initSidebar('invoices.html');
-            loadCompanyName();
-            loadInvoices();
-        });
     </script>
 </body>
 </html>

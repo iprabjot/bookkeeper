@@ -25,21 +25,7 @@
 
             <main class="flex-1 overflow-y-auto p-6">
                 <!-- Upload Section -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload Bank Statement (CSV)</h3>
-                    <div class="upload-area" onclick="document.getElementById('bank-file').click()">
-                        <input type="file" id="bank-file" accept=".csv" onchange="handleBankUpload(event)">
-                        <i class="fas fa-file-csv text-5xl text-gray-400 mb-4"></i>
-                        <p class="text-lg font-medium text-gray-700">Click to select or drag & drop CSV bank statement</p>
-                        <p class="text-sm text-gray-500 mt-2">Supports CSV format with Date, Description, Debit, Credit columns</p>
-                    </div>
-                    <div id="upload-progress" class="upload-progress hidden mt-4">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                    </div>
-                    <div id="upload-message" class="mt-4"></div>
-                </div>
+                <div id="bank-upload-component"></div>
 
                 <div class="flex gap-3 mb-6">
                     <button onclick="runReconciliation()" class="btn-primary">
@@ -85,44 +71,33 @@
 
     <script src="/static/api.js"></script>
     <script src="/static/sidebar.js"></script>
+    <script src="/static/upload-component.js"></script>
     <script>
-        async function handleBankUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        // Initialize bank statement upload component
+        let bankUploadComponent;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            bankUploadComponent = new FileUploadComponent({
+                containerId: 'bank-upload-component',
+                accept: '.csv',
+                multiple: false,
+                uploadText: 'Upload Bank Statement (CSV)',
+                dragText: 'Click to select or drag & drop CSV file',
+                helpText: 'Supports CSV format with Date, Description, Debit, Credit columns',
+                onUpload: async (file) => {
+                    const transactions = await window.uploadBankStatement(file);
+                    // Reload transactions after successful upload
+                    setTimeout(() => {
+                        loadTransactions();
+                    }, 500);
+                    return transactions;
+                }
+            });
             
-            const progressEl = document.getElementById('upload-progress');
-            const progressFill = document.getElementById('progress-fill');
-            const messageEl = document.getElementById('upload-message');
-            
-            progressEl.classList.remove('hidden');
-            progressFill.style.width = '0%';
-            messageEl.innerHTML = '';
-            
-            try {
-                progressFill.style.width = '50%';
-                const transactions = await window.uploadBankStatement(file);
-                progressFill.style.width = '100%';
-                
-                messageEl.innerHTML = `
-                    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                         Uploaded ${transactions.length} transaction(s) successfully!
-                    </div>
-                `;
-                
-                setTimeout(() => {
-                    progressEl.classList.add('hidden');
-                    progressFill.style.width = '0%';
-                    loadTransactions();
-                }, 2000);
-            } catch (error) {
-                progressFill.style.width = '0%';
-                messageEl.innerHTML = `
-                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                         Error: ${error.message}
-                    </div>
-                `;
-            }
-        }
+            initSidebar('bank-statements.html');
+            loadCompanyName();
+            loadTransactions();
+        });
         
         async function loadTransactions() {
             const loadingEl = document.getElementById('transactions-loading');
@@ -188,27 +163,6 @@
         // Make available globally
         window.runReconciliation = runReconciliationUI;
 
-        // Drag and drop
-        const uploadArea = document.querySelector('.upload-area');
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type === 'text/csv') {
-                document.getElementById('bank-file').files = e.dataTransfer.files;
-                handleBankUpload({ target: document.getElementById('bank-file') });
-            }
-        });
-
         async function loadCompanyName() {
             try {
                 const company = await window.getCurrentCompany();
@@ -217,12 +171,6 @@
                 document.getElementById('company-name-nav').textContent = 'No company set';
             }
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            initSidebar('bank-statements.html');
-            loadCompanyName();
-            loadTransactions();
-        });
     </script>
 </body>
 </html>
