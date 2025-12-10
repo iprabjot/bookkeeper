@@ -2,8 +2,9 @@
 Real-time CSV Report Generator
 Regenerates CSV reports when journal entries are added and stores them in database
 """
+import logging
 from database.models import (
-    JournalEntry, JournalEntryLine, ReportBundle, Report
+    JournalEntry, JournalEntryLine, ReportBundle, Report, BankTransaction
 )
 from database.db import get_db
 from core.company_manager import CompanyManager
@@ -11,10 +12,18 @@ from utils.accounting_reports import (
     generate_journal_entries_csv_string,
     generate_trial_balance_csv_string,
     generate_ledger_csv_string,
-    extract_account_names
+    extract_account_names,
+    generate_profit_loss_csv_string,
+    generate_cash_flow_csv_string
+)
+from core.financial_report_agent import (
+    generate_profit_loss_statement,
+    generate_cash_flow_statement
 )
 from datetime import datetime
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = None):
@@ -88,7 +97,7 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
         if journal_csv:
             report = Report(
                 bundle_id=bundle.bundle_id,
-                report_type="journal_entries",  # Pass string directly to avoid SQLAlchemy enum conversion
+                report_type="journal_entries",
                 content=journal_csv,
                 filename="Journal Entries.csv",
                 size_bytes=len(journal_csv.encode('utf-8'))
@@ -100,7 +109,7 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
         if trial_balance_csv:
             report = Report(
                 bundle_id=bundle.bundle_id,
-                report_type="trial_balance",  # Pass string directly to avoid SQLAlchemy enum conversion
+                report_type="trial_balance",
                 content=trial_balance_csv,
                 filename="Trial Balance.csv",
                 size_bytes=len(trial_balance_csv.encode('utf-8'))
@@ -115,13 +124,87 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
                 safe_name = account_name.replace(" ", " ").replace("/", "-")
                 report = Report(
                     bundle_id=bundle.bundle_id,
-                    report_type="ledger",  # Pass string directly to avoid SQLAlchemy enum conversion
+                    report_type="ledger",
                     account_name=account_name,
                     content=ledger_csv,
                     filename=f"Ledger - {safe_name}.csv",
                     size_bytes=len(ledger_csv.encode('utf-8'))
                 )
                 db.add(report)
+        
+        # Generate Profit & Loss Statement using AI agent
+        try:
+            logger.info("Generating Profit & Loss statement...")
+            period_start = entries[0].date.isoformat() if entries else datetime.now().replace(day=1).isoformat()
+            period_end = entries[-1].date.isoformat() if entries else datetime.now().isoformat()
+            
+            pnl_data = generate_profit_loss_statement(
+                journal_entries_data,
+                period_start=period_start,
+                period_end=period_end
+            )
+            
+            if pnl_data:
+                pnl_csv = generate_profit_loss_csv_string(pnl_data)
+                if pnl_csv:
+                    report = Report(
+                        bundle_id=bundle.bundle_id,
+                        report_type="profit_loss",
+                        content=pnl_csv,
+                        filename="Profit and Loss.csv",
+                        size_bytes=len(pnl_csv.encode('utf-8'))
+                    )
+                    db.add(report)
+                    logger.info("Successfully generated Profit & Loss statement")
+            else:
+                logger.warning("AI agent did not generate P&L data")
+        except Exception as e:
+            logger.error(f"Failed to generate P&L statement: {e}", exc_info=True)
+            # Continue with other reports even if P&L fails
+        
+        # Generate Cash Flow Statement using AI agent
+        try:
+            logger.info("Generating Cash Flow statement...")
+            
+            # Get bank transactions for cash flow
+            bank_transactions = db.query(BankTransaction).filter(
+                BankTransaction.company_id == current_company.company_id
+            ).order_by(BankTransaction.date).all()
+            
+            bank_txns_list = [
+                {
+                    "date": txn.date,
+                    "amount": txn.amount,
+                    "type": str(txn.type),
+                    "description": txn.description or ""
+                }
+                for txn in bank_transactions
+            ]
+            
+            cash_flow_data = generate_cash_flow_statement(
+                journal_entries_data,
+                bank_txns_list,
+                period_start=period_start,
+                period_end=period_end
+            )
+            
+            if cash_flow_data:
+                cash_flow_csv = generate_cash_flow_csv_string(cash_flow_data)
+                if cash_flow_csv:
+                    report = Report(
+                        bundle_id=bundle.bundle_id,
+                        report_type="cash_flow",
+                        content=cash_flow_csv,
+                        filename="Cash Flow.csv",
+                        size_bytes=len(cash_flow_csv.encode('utf-8'))
+                    )
+                    db.add(report)
+                    logger.info("Successfully generated Cash Flow statement")
+            else:
+                logger.warning("AI agent did not generate Cash Flow data")
+        except Exception as e:
+            logger.error(f"Failed to generate Cash Flow statement: {e}", exc_info=True)
+            # Continue even if Cash Flow fails
         
         db.commit()
         return bundle.bundle_id
@@ -131,4 +214,3 @@ def regenerate_csvs(user_id: Optional[int] = None, description: Optional[str] = 
         raise e
     finally:
         db.close()
-
