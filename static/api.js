@@ -330,6 +330,16 @@ async function createBuyer(data) {
     });
 }
 
+async function getProfitLossCsv(bundleId = null) {
+    const params = bundleId ? `?bundle_id=${bundleId}` : '';
+    return apiRequest(`/reports/profit-loss${params}`);
+}
+
+async function getCashFlowCsv(bundleId = null) {
+    const params = bundleId ? `?bundle_id=${bundleId}` : '';
+    return apiRequest(`/reports/cash-flow${params}`);
+}
+
 async function generateReports(description) {
     const url = description 
         ? `/reports/generate?description=${encodeURIComponent(description)}`
@@ -403,6 +413,8 @@ async function verifyEmail(token) {
 }
 
 // Make available globally
+window.getProfitLossCsv = getProfitLossCsv;
+window.getCashFlowCsv = getCashFlowCsv;
 window.generateReports = generateReports;
 window.listReports = listReports;
 window.listBundles = listBundles;
@@ -467,6 +479,8 @@ window.getVendors = getVendors;
 window.getBuyers = getBuyers;
 window.createVendor = createVendor;
 window.createBuyer = createBuyer;
+window.getProfitLossCsv = getProfitLossCsv;
+window.getCashFlowCsv = getCashFlowCsv;
 window.generateReports = generateReports;
 window.listReports = listReports;
 window.listBundles = listBundles;

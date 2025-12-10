@@ -211,6 +211,88 @@ async def get_trial_balance_csv(
     )
 
 
+@router.get("/reports/profit-loss")
+async def get_profit_loss_csv(
+    bundle_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download Profit & Loss Statement CSV from latest or specified bundle"""
+    if bundle_id:
+        bundle = db.query(ReportBundle).filter(
+            ReportBundle.bundle_id == bundle_id,
+            ReportBundle.company_id == current_user.company_id
+        ).first()
+    else:
+        bundle = get_latest_bundle(db, current_user.company_id)
+    
+    if not bundle:
+        raise HTTPException(
+            status_code=404,
+            detail="No reports found. Generate reports first."
+        )
+    
+    report = db.query(Report).filter(
+        Report.bundle_id == bundle.bundle_id,
+        Report.report_type == "profit_loss"
+    ).first()
+    
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="Profit & Loss statement not found in this bundle"
+        )
+    
+    return Response(
+        content=report.content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
+        }
+    )
+
+
+@router.get("/reports/cash-flow")
+async def get_cash_flow_csv(
+    bundle_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download Cash Flow Statement CSV from latest or specified bundle"""
+    if bundle_id:
+        bundle = db.query(ReportBundle).filter(
+            ReportBundle.bundle_id == bundle_id,
+            ReportBundle.company_id == current_user.company_id
+        ).first()
+    else:
+        bundle = get_latest_bundle(db, current_user.company_id)
+    
+    if not bundle:
+        raise HTTPException(
+            status_code=404,
+            detail="No reports found. Generate reports first."
+        )
+    
+    report = db.query(Report).filter(
+        Report.bundle_id == bundle.bundle_id,
+        Report.report_type == "cash_flow"
+    ).first()
+    
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="Cash Flow statement not found in this bundle"
+        )
+    
+    return Response(
+        content=report.content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; {encode_filename_for_header(report.filename)}'
+        }
+    )
+
+
 @router.get("/reports/ledger/{account_name:path}")
 async def get_ledger_csv(
     account_name: str,
@@ -294,6 +376,22 @@ async def list_reports(
                 "name": "Trial Balance",
                 "type": "standard",
                 "endpoint": f"/api/reports/trial-balance?bundle_id={bundle.bundle_id}",
+                "download_url": f"/reports/{report.report_id}/download",
+                "filename": report.filename
+            })
+        elif report_type_str == "profit_loss":
+            reports.append({
+                "name": "Profit & Loss",
+                "type": "financial_statement",
+                "endpoint": f"/api/reports/profit-loss?bundle_id={bundle.bundle_id}",
+                "download_url": f"/reports/{report.report_id}/download",
+                "filename": report.filename
+            })
+        elif report_type_str == "cash_flow":
+            reports.append({
+                "name": "Cash Flow",
+                "type": "financial_statement",
+                "endpoint": f"/api/reports/cash-flow?bundle_id={bundle.bundle_id}",
                 "download_url": f"/reports/{report.report_id}/download",
                 "filename": report.filename
             })
