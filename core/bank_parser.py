@@ -10,7 +10,7 @@ from database.db import get_db
 from core.company_manager import CompanyManager
 
 
-def parse_bank_statement_csv(file_path: str) -> List[BankTransaction]:
+def parse_bank_statement_csv(file_path: str, company_id: int = None) -> List[BankTransaction]:
     """
     Parse CSV bank statement and create bank transactions
     
@@ -20,14 +20,27 @@ def parse_bank_statement_csv(file_path: str) -> List[BankTransaction]:
     - SBI: Date, Description, Withdrawal, Deposit, Balance
     - Generic: Date, Description, Amount, Type
     
+    Args:
+        file_path: Path to CSV file
+        company_id: Company ID to associate transactions with. If None, uses current company (fallback)
+    
     Returns:
         List of created BankTransaction objects
     """
     db = next(get_db())
     try:
-        current_company = CompanyManager.get_current_company()
-        if not current_company:
-            raise ValueError("No current company set")
+        # Use provided company_id, or fall back to current company
+        if company_id is None:
+            current_company = CompanyManager.get_current_company()
+            if not current_company:
+                raise ValueError("No current company set and no company_id provided")
+            company_id = current_company.company_id
+        else:
+            # Verify company exists
+            from database.models import Company
+            company = db.query(Company).filter(Company.company_id == company_id).first()
+            if not company:
+                raise ValueError(f"Company with ID {company_id} not found")
         
         transactions = []
         
@@ -51,12 +64,12 @@ def parse_bank_statement_csv(file_path: str) -> List[BankTransaction]:
         
         for row in rows:
             # Try to detect format and extract data
-            transaction = parse_transaction_row(row, current_company.company_id)
+            transaction = parse_transaction_row(row, company_id)
             if transaction:
                 # Check for duplicates before adding
                 # Match on: company, date, amount, type, and reference (if available)
                 query = db.query(BankTransaction).filter(
-                    BankTransaction.company_id == current_company.company_id,
+                    BankTransaction.company_id == company_id,
                     BankTransaction.date == transaction.date,
                     BankTransaction.amount == transaction.amount,
                     BankTransaction.type == transaction.type

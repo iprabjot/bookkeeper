@@ -13,28 +13,40 @@ from core.company_manager import CompanyManager
 from core.report_generator import regenerate_csvs
 
 
-def reconcile_transactions() -> Dict:
+def reconcile_transactions(company_id: int = None) -> Dict:
     """
     Run automatic reconciliation of unmatched bank transactions with invoices
+    
+    Args:
+        company_id: Company ID to reconcile for. If None, uses current company (fallback)
     
     Returns:
         Dictionary with reconciliation summary
     """
     db = next(get_db())
     try:
-        current_company = CompanyManager.get_current_company()
-        if not current_company:
-            raise ValueError("No current company set")
+        # Use provided company_id, or fall back to current company
+        if company_id is None:
+            current_company = CompanyManager.get_current_company()
+            if not current_company:
+                raise ValueError("No current company set and no company_id provided")
+            company_id = current_company.company_id
+        else:
+            # Verify company exists
+            from database.models import Company
+            company = db.query(Company).filter(Company.company_id == company_id).first()
+            if not company:
+                raise ValueError(f"Company with ID {company_id} not found")
         
         # Get unmatched transactions
         unmatched_txns = db.query(BankTransaction).filter(
-            BankTransaction.company_id == current_company.company_id,
+            BankTransaction.company_id == company_id,
             BankTransaction.status == TransactionStatus.UNMATCHED
         ).all()
         
         # Get pending invoices
         pending_invoices = db.query(Invoice).filter(
-            Invoice.company_id == current_company.company_id,
+            Invoice.company_id == company_id,
             Invoice.status == InvoiceStatus.PENDING
         ).all()
         
@@ -128,7 +140,7 @@ def reconcile_transactions() -> Dict:
         
         # Regenerate CSVs if any matches were found or existing ones were settled
         if matches or settled_existing > 0:
-            regenerate_csvs(company_id=current_company.company_id)
+            regenerate_csvs(company_id=company_id)
         
         return {
             "total_transactions": len(unmatched_txns),

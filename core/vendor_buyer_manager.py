@@ -15,13 +15,22 @@ class VendorBuyerManager:
     @staticmethod
     def get_or_create_vendor(name: str, gstin: Optional[str] = None, 
                             address: Optional[str] = None,
-                            contact_info: Optional[str] = None) -> Vendor:
+                            contact_info: Optional[str] = None,
+                            company_id: Optional[int] = None) -> Vendor:
         """Get existing vendor or create new one"""
         db = next(get_db())
         try:
-            current_company = CompanyManager.get_current_company()
-            if not current_company:
-                raise ValueError("No current company set")
+            # Use provided company_id, or fall back to current company
+            if company_id is None:
+                current_company = CompanyManager.get_current_company()
+                if not current_company:
+                    raise ValueError("No current company set and no company_id provided")
+                company_id = current_company.company_id
+            else:
+                # Verify company exists
+                company = db.query(Company).filter(Company.company_id == company_id).first()
+                if not company:
+                    raise ValueError(f"Company with ID {company_id} not found")
             
             # Validate name
             if not name or not name.strip():
@@ -33,7 +42,7 @@ class VendorBuyerManager:
             # Try to find by GSTIN first
             if gstin:
                 vendor = db.query(Vendor).filter(
-                    Vendor.company_id == current_company.company_id,
+                    Vendor.company_id == company_id,
                     Vendor.gstin == gstin
                 ).first()
                 if vendor:
@@ -41,7 +50,7 @@ class VendorBuyerManager:
             
             # Try to find by name
             vendor = db.query(Vendor).filter(
-                Vendor.company_id == current_company.company_id,
+                Vendor.company_id == company_id,
                 Vendor.name.ilike(f"%{name}%")
             ).first()
             
@@ -54,7 +63,7 @@ class VendorBuyerManager:
             
             # Create new vendor
             vendor = Vendor(
-                company_id=current_company.company_id,
+                company_id=company_id,
                 name=name,
                 gstin=gstin,
                 address=address,
@@ -70,13 +79,22 @@ class VendorBuyerManager:
     @staticmethod
     def get_or_create_buyer(name: str, gstin: Optional[str] = None,
                            address: Optional[str] = None,
-                           contact_info: Optional[str] = None) -> Buyer:
+                           contact_info: Optional[str] = None,
+                           company_id: Optional[int] = None) -> Buyer:
         """Get existing buyer or create new one"""
         db = next(get_db())
         try:
-            current_company = CompanyManager.get_current_company()
-            if not current_company:
-                raise ValueError("No current company set")
+            # Use provided company_id, or fall back to current company
+            if company_id is None:
+                current_company = CompanyManager.get_current_company()
+                if not current_company:
+                    raise ValueError("No current company set and no company_id provided")
+                company_id = current_company.company_id
+            else:
+                # Verify company exists
+                company = db.query(Company).filter(Company.company_id == company_id).first()
+                if not company:
+                    raise ValueError(f"Company with ID {company_id} not found")
             
             # Validate name
             if not name or not name.strip():
@@ -88,7 +106,7 @@ class VendorBuyerManager:
             # Try to find by GSTIN first
             if gstin:
                 buyer = db.query(Buyer).filter(
-                    Buyer.company_id == current_company.company_id,
+                    Buyer.company_id == company_id,
                     Buyer.gstin == gstin
                 ).first()
                 if buyer:
@@ -96,7 +114,7 @@ class VendorBuyerManager:
             
             # Try to find by name
             buyer = db.query(Buyer).filter(
-                Buyer.company_id == current_company.company_id,
+                Buyer.company_id == company_id,
                 Buyer.name.ilike(f"%{name}%")
             ).first()
             
@@ -109,7 +127,7 @@ class VendorBuyerManager:
             
             # Create new buyer
             buyer = Buyer(
-                company_id=current_company.company_id,
+                company_id=company_id,
                 name=name,
                 gstin=gstin,
                 address=address,
@@ -173,14 +191,16 @@ class VendorBuyerManager:
     @staticmethod
     def create_vendor(name: str, gstin: Optional[str] = None,
                      address: Optional[str] = None,
-                     contact_info: Optional[str] = None) -> Vendor:
+                     contact_info: Optional[str] = None,
+                     company_id: Optional[int] = None) -> Vendor:
         """Create a new vendor (use get_or_create_vendor to avoid duplicates)"""
-        return VendorBuyerManager.get_or_create_vendor(name, gstin, address, contact_info)
+        return VendorBuyerManager.get_or_create_vendor(name, gstin, address, contact_info, company_id)
     
     @staticmethod
     def create_buyer(name: str, gstin: Optional[str] = None,
                     address: Optional[str] = None,
-                    contact_info: Optional[str] = None) -> Buyer:
+                    contact_info: Optional[str] = None,
+                    company_id: Optional[int] = None) -> Buyer:
         """Create a new buyer (use get_or_create_buyer to avoid duplicates)"""
-        return VendorBuyerManager.get_or_create_buyer(name, gstin, address, contact_info)
+        return VendorBuyerManager.get_or_create_buyer(name, gstin, address, contact_info, company_id)
 

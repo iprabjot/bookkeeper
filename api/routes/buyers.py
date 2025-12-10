@@ -35,7 +35,8 @@ async def create_buyer(buyer: BuyerCreate, current_user: User = Depends(get_curr
             name=buyer.name,
             gstin=buyer.gstin,
             address=buyer.address,
-            contact_info=buyer.contact_info
+            contact_info=buyer.contact_info,
+            company_id=current_user.company_id
         )
         # Verify it belongs to user's company
         if new_buyer.company_id != current_user.company_id:

@@ -17,7 +17,7 @@ router = APIRouter()
 async def run_reconciliation(current_user: User = Depends(get_current_user)):
     """Run automatic reconciliation"""
     try:
-        result = reconcile_transactions()
+        result = reconcile_transactions(company_id=current_user.company_id)
         return result
     except Exception as e:
         logger.error(f"Reconciliation error: {type(e).__name__}: {str(e)}", exc_info=True)

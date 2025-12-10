@@ -7,20 +7,33 @@ from typing import Dict, Any
 from core.company_manager import CompanyManager
 
 
-def classify_invoice(invoice_data: Dict) -> Dict[str, Any]:
+def classify_invoice(invoice_data: Dict, company_id: int = None) -> Dict[str, Any]:
     """
     Classify invoice as sales or purchase based on letterhead/company matching
     
     Args:
         invoice_data: Dictionary with vendor_name, vendor_gstin, customer_name, customer_gstin
+        company_id: Company ID to compare against. If None, uses current company (fallback)
         
     Returns:
         Dictionary with type ('sales' or 'purchase') and confidence (0.0-1.0)
     """
-    current_company = CompanyManager.get_current_company()
+    from database.models import Company
+    from database.db import get_db
     
-    if not current_company:
-        raise ValueError("No current company set. Please set a current company first.")
+    db = next(get_db())
+    try:
+        if company_id is None:
+            current_company = CompanyManager.get_current_company()
+            if not current_company:
+                raise ValueError("No current company set and no company_id provided")
+            company_id = current_company.company_id
+        
+        current_company = db.query(Company).filter(Company.company_id == company_id).first()
+        if not current_company:
+            raise ValueError(f"Company with ID {company_id} not found")
+    finally:
+        db.close()
     
     # Handle None values - convert to empty string before calling string methods
     vendor_name = (invoice_data.get("vendor_name") or "").upper().strip()

@@ -46,7 +46,7 @@ async def upload_invoice(file: UploadFile = File(...), current_user: User = Depe
             raise HTTPException(status_code=400, detail=error_detail)
         
         # Process invoice (create journal entry, etc.)
-        invoice = process_invoice(invoice_data, tmp_path)
+        invoice = process_invoice(invoice_data, tmp_path, company_id=current_user.company_id)
         
         return invoice
     except ValueError as e:

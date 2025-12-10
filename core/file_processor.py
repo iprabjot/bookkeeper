@@ -40,7 +40,7 @@ def process_invoice_file(upload_id: int, db: Session):
             )
         
         # Process invoice (create journal entry, etc.)
-        invoice = process_invoice(invoice_data, upload.file_path)
+        invoice = process_invoice(invoice_data, upload.file_path, company_id=upload.company_id)
         
         # Update upload record with success
         upload.status = FileUploadStatus.COMPLETED

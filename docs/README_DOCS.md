@@ -29,3 +29,4 @@ This folder contains all project documentation.
 - **`API_CALLS_AUDIT.md`**: Frontend API call audit
 - **`EXCEL_TABLE_LIBRARIES.md`**: React packages for Excel-like tables
 - **`README_UI.md`**: UI documentation
+- **`LOGGING.md`**: How to check logs (local and Railway)

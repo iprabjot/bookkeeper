@@ -27,7 +27,7 @@ async def upload_bank_statement(file: UploadFile = File(...), current_user: User
     
     try:
         # Parse bank statement
-        transactions = parse_bank_statement_csv(tmp_path)
+        transactions = parse_bank_statement_csv(tmp_path, company_id=current_user.company_id)
         return transactions
     except Exception as e:
         import logging

@@ -29,25 +29,35 @@ def _parse_date(date_str: str) -> datetime:
             return None
 
 
-def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
+def process_invoice(invoice_data: Dict, file_path: str, company_id: int = None) -> Invoice:
     """
     Process an invoice: classify, create vendor/buyer, create journal entry
     
     Args:
         invoice_data: Extracted invoice data from PDF
         file_path: Path to the invoice PDF file
+        company_id: Company ID to process invoice for. If None, uses current company (fallback)
         
     Returns:
         Created Invoice object
     """
     db = next(get_db())
     try:
-        current_company = CompanyManager.get_current_company()
-        if not current_company:
-            raise ValueError("No current company set")
+        # Use provided company_id, or fall back to current company
+        if company_id is None:
+            current_company = CompanyManager.get_current_company()
+            if not current_company:
+                raise ValueError("No current company set and no company_id provided")
+            company_id = current_company.company_id
+        else:
+            # Verify company exists
+            from database.models import Company
+            current_company = db.query(Company).filter(Company.company_id == company_id).first()
+            if not current_company:
+                raise ValueError(f"Company with ID {company_id} not found")
         
         # Classify invoice
-        classification = classify_invoice(invoice_data)
+        classification = classify_invoice(invoice_data, company_id=company_id)
         invoice_type_str = classification["type"]
         invoice_type = InvoiceType.SALES if invoice_type_str == "sales" else InvoiceType.PURCHASE
         
@@ -67,7 +77,8 @@ def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
                 name=vendor_name.strip(),
                 gstin=vendor_gstin.strip() if vendor_gstin else None,
                 address=None,
-                contact_info=None
+                contact_info=None,
+                company_id=company_id
             )
             vendor_id = vendor.vendor_id
         else:
@@ -82,7 +93,8 @@ def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
                 name=customer_name.strip(),
                 gstin=customer_gstin.strip() if customer_gstin else None,
                 address=None,
-                contact_info=None
+                contact_info=None,
+                company_id=company_id
             )
             buyer_id = buyer.buyer_id
         
@@ -114,7 +126,7 @@ def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
         # Check for duplicate invoice
         # Duplicate criteria: same company, same invoice number, same date, and same amount
         duplicate_query = db.query(Invoice).filter(
-            Invoice.company_id == current_company.company_id,
+            Invoice.company_id == company_id,
             Invoice.invoice_number == invoice_number
         )
         
@@ -150,7 +162,7 @@ def process_invoice(invoice_data: Dict, file_path: str) -> Invoice:
         
         # Create invoice record
         invoice = Invoice(
-            company_id=current_company.company_id,
+            company_id=company_id,
             vendor_id=vendor_id,
             buyer_id=buyer_id,
             invoice_type=invoice_type,

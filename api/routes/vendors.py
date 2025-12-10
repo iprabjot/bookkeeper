@@ -35,7 +35,8 @@ async def create_vendor(vendor: VendorCreate, current_user: User = Depends(get_c
             name=vendor.name,
             gstin=vendor.gstin,
             address=vendor.address,
-            contact_info=vendor.contact_info
+            contact_info=vendor.contact_info,
+            company_id=current_user.company_id
         )
         # Verify it belongs to user's company
         if new_vendor.company_id != current_user.company_id:
