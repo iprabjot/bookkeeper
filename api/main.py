@@ -77,6 +77,15 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon at root level for browser compatibility"""
+    favicon_path = Path(__file__).parent.parent / "static" / "favicon.svg"
+    if favicon_path.exists():
+        return FileResponse(str(favicon_path), media_type="image/svg+xml")
+    raise HTTPException(status_code=404)
+
+
 # Serve static files (after API routes to avoid conflicts)
 static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
