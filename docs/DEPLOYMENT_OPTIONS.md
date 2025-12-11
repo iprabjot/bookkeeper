@@ -40,11 +40,8 @@ This guide covers the best deployment options for the Bookkeeper application, fo
    - Add all variables from `.env.example`:
      ```
      JWT_SECRET_KEY=<generate-a-random-secret>
-     SMTP_HOST=smtp.gmail.com
-     SMTP_PORT=587
-     SMTP_USER=your-email@gmail.com
-     SMTP_PASSWORD=your-app-password
-     EMAIL_FROM=your-email@gmail.com
+     RESEND_API_KEY=re_your-api-key-here
+     EMAIL_FROM=noreply@yourdomain.com
      EMAIL_FROM_NAME=Bookkeeper
      OPENAI_API_KEY=your-key (optional)
      ```
@@ -164,7 +161,7 @@ This guide covers the best deployment options for the Bookkeeper application, fo
 4. **Set Secrets**:
    ```bash
    fly secrets set JWT_SECRET_KEY=<your-secret>
-   fly secrets set SMTP_HOST=smtp.gmail.com
+   fly secrets set RESEND_API_KEY=re_your-api-key-here
    # ... etc
    ```
 
@@ -231,12 +228,9 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# SMTP (for emails)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-EMAIL_FROM=your-email@gmail.com
+# Email (Resend API)
+RESEND_API_KEY=re_your-api-key-here
+EMAIL_FROM=noreply@yourdomain.com
 EMAIL_FROM_NAME=Bookkeeper
 
 # OpenAI (optional, for AI extraction)

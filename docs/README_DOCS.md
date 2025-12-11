@@ -14,8 +14,7 @@ This folder contains all project documentation.
 
 - **`AUTH_IMPLEMENTATION.md`**: Authentication system implementation details
 - **`AUTH_COMPLETE.md`**: Complete authentication guide
-- **`GMAIL_SMTP_SETUP.md`**: Gmail SMTP configuration guide
-- **`SMTP_RECOMMENDATIONS.md`**: Free SMTP service recommendations
+- **`RESEND_SETUP.md`**: Resend email service setup guide
 
 ## Database & Migrations
 

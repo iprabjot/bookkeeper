@@ -6,7 +6,7 @@ This guide walks you through deploying Bookkeeper to Railway step-by-step.
 
 - GitHub account
 - Railway account (sign up at [railway.app](https://railway.app))
-- Gmail account (for SMTP, optional but recommended)
+- Resend account (for email, see [Resend Setup](RESEND_SETUP.md))
 
 ## Step 1: Prepare Your Repository
 
@@ -68,25 +68,14 @@ This guide walks you through deploying Bookkeeper to Railway step-by-step.
 
 ### Optional Variables (for full functionality)
 
-**SMTP Configuration** (for email notifications):
+**Resend Configuration** (for email notifications):
 
-**⚠️ Important**: Gmail SMTP may not work on Railway due to network restrictions. **Use SendGrid instead** (see [SMTP Troubleshooting](RAILWAY_SMTP_TROUBLESHOOTING.md)).
+See [Resend Setup Guide](RESEND_SETUP.md) for detailed instructions.
 
-**Option 1: SendGrid (Recommended for Railway)**
-- `SMTP_HOST`: `smtp.sendgrid.net`
-- `SMTP_PORT`: `587`
-- `SMTP_USER`: `apikey`
-- `SMTP_PASSWORD`: Your SendGrid API key
-- `EMAIL_FROM`: Your verified email address
-- `EMAIL_FROM_NAME`: `Bookkeeper`
-
-**Option 2: Gmail (May not work on Railway)**
-- `SMTP_HOST`: `smtp.gmail.com`
-- `SMTP_PORT`: `587` (or `465` if 587 doesn't work)
-- `SMTP_USER`: Your Gmail address
-- `SMTP_PASSWORD`: Your Gmail App Password ([see Gmail setup guide](GMAIL_SMTP_SETUP.md))
-- `EMAIL_FROM`: Your Gmail address
-- `EMAIL_FROM_NAME`: `Bookkeeper`
+Required variables:
+- `RESEND_API_KEY`: Your Resend API key (starts with `re_`)
+- `EMAIL_FROM`: Your verified sending email address (or `onboarding@resend.dev` for testing)
+- `EMAIL_FROM_NAME`: `Bookkeeper` (optional)
 
 **OpenAI API** (for AI invoice extraction):
 - `OPENAI_API_KEY`: Your OpenAI or OpenRouter API key

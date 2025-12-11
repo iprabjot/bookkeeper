@@ -19,9 +19,9 @@
 -  Temporary password generation for new users
 
 ### 4. Email Service
--  SMTP configuration support
+-  Resend API integration
 -  Email templates (welcome, invitation)
--  Async email sending with aiosmtplib
+-  Async email sending with aiohttp
 
 ### 5. Docker Setup
 -  Dockerfile (multi-stage build)
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and configure:
 - Database URL
 - JWT secret key (generate a secure one!)
-- SMTP credentials (for email)
+- Resend API key (for email)
 - OpenAI API key (for invoice extraction)
 
 ### 3. Initialize Database
@@ -128,7 +128,7 @@ curl -X GET "http://localhost:8000/api/invoices" \
 1. **Protect all routes** - Add auth dependency to existing routes
 2. **Create UI pages** - Login and signup forms
 3. **Update frontend** - Add token storage and automatic token refresh
-4. **Test email** - Configure SMTP and test email sending
+4. **Test email** - Configure Resend API and test email sending
 5. **Deploy** - Use Docker Compose or deploy to cloud platform
 
 ## Security Notes

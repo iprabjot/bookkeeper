@@ -58,7 +58,7 @@ alembic upgrade head
 
 - See `MIGRATION_GUIDE.md` for detailed migration workflows
 - See `INITIAL_MIGRATION.md` for initial migration details
-- See `SMTP_RECOMMENDATIONS.md` for free SMTP service options
+- See `RESEND_SETUP.md` for email service setup
 
 ## Initial Migration
 

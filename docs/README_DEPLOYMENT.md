@@ -12,7 +12,7 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and set:
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET_KEY` - Secure random string (min 32 chars)
-- `SMTP_*` - Email configuration (optional, see SMTP_RECOMMENDATIONS.md)
+- `RESEND_API_KEY` - Resend API key (optional, see [Resend Setup](RESEND_SETUP.md))
 
 ### 3. Run Database Migrations
 
@@ -79,42 +79,25 @@ alembic downgrade -1
 
 See `MIGRATION_GUIDE.md` for detailed documentation.
 
-## Free SMTP Services
+## Email Configuration
 
-### Recommended: Gmail (Easiest)
+This application uses **Resend** for sending emails.
 
-1. Enable 2FA on Gmail
-2. Create App Password: Google Account → Security → App passwords
+### Setup Resend
+
+See the [Resend Setup Guide](RESEND_SETUP.md) for detailed instructions.
+
+**Quick Setup:**
+1. Sign up at https://resend.com
+2. Get your API key from API Keys section (starts with `re_`)
 3. Configure `.env`:
 ```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-16-char-app-password
-EMAIL_FROM=your-email@gmail.com
+RESEND_API_KEY=re_your-api-key-here
+EMAIL_FROM=onboarding@resend.dev
 EMAIL_FROM_NAME=Bookkeeper
 ```
 
-**Limits**: 500 emails/day (free Gmail)
-
-### Alternative: SendGrid (Best for Production)
-
-1. Sign up at https://sendgrid.com
-2. Verify sender email
-3. Create API key
-4. Configure `.env`:
-```env
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USER=apikey
-SMTP_PASSWORD=your-sendgrid-api-key
-EMAIL_FROM=your-verified-email@domain.com
-EMAIL_FROM_NAME=Bookkeeper
-```
-
-**Limits**: 100 emails/day (free tier)
-
-See `SMTP_RECOMMENDATIONS.md` for more options (Mailgun, Brevo, Amazon SES).
+**Free Tier**: 3,000 emails/month (100/day)
 
 ## Docker Deployment
 
@@ -139,14 +122,14 @@ docker-compose up -d --build
 Create `.env` file or set in `docker-compose.yml`:
 - Database credentials
 - JWT secret key
-- SMTP settings
+- Resend API key
 - OpenAI API key
 
 ## Production Checklist
 
 - [ ] Set secure `JWT_SECRET_KEY` (32+ characters)
 - [ ] Use strong database passwords
-- [ ] Configure SMTP for email notifications
+- [ ] Configure Resend API key for email notifications
 - [ ] Set up HTTPS/SSL
 - [ ] Configure CORS properly (not `*`)
 - [ ] Set up database backups
@@ -177,9 +160,9 @@ Create `.env` file or set in `docker-compose.yml`:
 - Check `alembic current` for current state
 
 ### Email Not Sending
-- Verify SMTP credentials
-- Check firewall/network
-- Test with Gmail first (easiest)
+- Verify Resend API key is set correctly (should start with `re_`)
+- Check Resend dashboard → Logs for delivery status
+- Verify sending domain is verified in Resend (or use `onboarding@resend.dev` for testing)
 - Check console logs for errors
 
 ### Authentication Issues
@@ -190,7 +173,7 @@ Create `.env` file or set in `docker-compose.yml`:
 ## Documentation
 
 - `MIGRATION_GUIDE.md` - Alembic migration workflows
-- `SMTP_RECOMMENDATIONS.md` - Free SMTP service options
+- `RESEND_SETUP.md` - Resend email setup
 - `AUTH_COMPLETE.md` - Authentication implementation details
 - `DEPLOYMENT_PLAN.md` - Full deployment plan
 

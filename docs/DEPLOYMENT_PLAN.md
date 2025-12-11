@@ -24,7 +24,7 @@ This document outlines the plan for adding authentication, user management, emai
 - Role-based access control
 
 ### 1.4 Email Service
-- SMTP configuration (Gmail, SendGrid, or similar)
+- Resend API for transactional emails
 - Email templates for:
   - Welcome email (with login credentials)
   - Password reset
@@ -70,11 +70,8 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+# Email (Resend API)
+RESEND_API_KEY=re_your-api-key-here
 EMAIL_FROM=noreply@bookkeeper.com
 EMAIL_FROM_NAME=Bookkeeper
 
@@ -127,7 +124,7 @@ OPENAI_MODEL_NAME=openai/gpt-4o-mini
 1.  Database: Add User model and relationships
 2.  Authentication: JWT, password hashing, login/signup
 3.  User Management: CRUD operations, role management
-4.  Email Service: SMTP setup, email templates
+4.  Email Service: Resend API setup, email templates
 5.  API Protection: Add auth middleware to routes
 6.  UI: Login/signup pages
 7.  Code Cleanup: Remove unused files

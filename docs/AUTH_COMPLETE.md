@@ -27,7 +27,7 @@
 - **Role-based Access Control**: Owners can manage all users, admins can manage accountants/viewers
 
 ### 4.  Email Service
-- **SMTP Configuration**: Supports Gmail, SendGrid, etc.
+- **Resend API**: Modern transactional email service
 - **Email Templates**: Welcome and invitation emails
 - **Functions**: `send_welcome_email()`, `send_invitation_email()`
 
@@ -82,11 +82,8 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# Email (optional, for sending welcome emails)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+# Email (Resend API)
+RESEND_API_KEY=re_your-api-key-here
 EMAIL_FROM=noreply@bookkeeper.com
 EMAIL_FROM_NAME=Bookkeeper
 ```
@@ -213,7 +210,7 @@ docker-compose up -d
 - [ ] Token refresh works when access token expires
 - [ ] Users can only access their company's data
 - [ ] Owner can create/manage users
-- [ ] Email sending works (if SMTP configured)
+- [ ] Email sending works (if Resend API configured)
 - [ ] Logout clears tokens and redirects
 
 ## Ready for Deployment! 
