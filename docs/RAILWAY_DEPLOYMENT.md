@@ -77,6 +77,10 @@ Required variables:
 - `EMAIL_FROM`: Your verified sending email address (or `onboarding@resend.dev` for testing)
 - `EMAIL_FROM_NAME`: `Bookkeeper` (optional)
 
+**Frontend URL** (for email links):
+- `FRONTEND_URL`: Your application's public URL (optional - Railway automatically provides `RAILWAY_STATIC_URL`)
+- **Note**: The app will automatically use `RAILWAY_STATIC_URL` if available, so you don't need to set `FRONTEND_URL` manually on Railway!
+
 **OpenAI API** (for AI invoice extraction):
 - `OPENAI_API_KEY`: Your OpenAI or OpenRouter API key
 - `OPENAI_API_BASE`: `https://openrouter.ai/api/v1` (if using OpenRouter)

@@ -20,6 +20,7 @@ from core.email_service import send_welcome_email, send_password_reset_email, te
 from core.company_manager import CompanyManager
 import secrets
 import string
+import os
 
 router = APIRouter()
 
@@ -211,7 +212,10 @@ async def send_verification_email(
         from database.models import Company
         
         company = db.query(Company).filter(Company.company_id == current_user.company_id).first()
-        verification_url = f"http://localhost:8000/verify-email.html?token={verification_token}"
+        
+        # Get frontend URL: Check Railway's RAILWAY_STATIC_URL first, then FRONTEND_URL, then default to localhost
+        frontend_url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("FRONTEND_URL", "http://localhost:8000")
+        verification_url = f"{frontend_url}/verify-email.html?token={verification_token}"
         
         html_body = render_template("""
         <!DOCTYPE html>

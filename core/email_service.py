@@ -19,6 +19,8 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_API_URL = "https://api.resend.com/emails"
 EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@bookkeeper.com")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Bookkeeper")
+# Frontend URL: Check Railway's RAILWAY_STATIC_URL first, then FRONTEND_URL, then default to localhost
+FRONTEND_URL = os.getenv("RAILWAY_STATIC_URL") or os.getenv("FRONTEND_URL", "http://localhost:8000")
 
 
 async def test_resend_api_key() -> bool:
@@ -267,9 +269,12 @@ async def send_welcome_email(
     name: str,
     company_name: str,
     password: str,
-    login_url: str = "http://localhost:8000/login.html"
+    login_url: str = None
 ) -> bool:
     """Send welcome email with login credentials"""
+    if not login_url:
+        login_url = f"{FRONTEND_URL}/login.html"
+    
     html_body = render_template(
         WELCOME_EMAIL_TEMPLATE,
         name=name,
@@ -307,9 +312,12 @@ async def send_invitation_email(
     company_name: str,
     role: str,
     password: str,
-    login_url: str = "http://localhost:8000/login.html"
+    login_url: str = None
 ) -> bool:
     """Send invitation email with login credentials"""
+    if not login_url:
+        login_url = f"{FRONTEND_URL}/login.html"
+    
     html_body = render_template(
         INVITATION_EMAIL_TEMPLATE,
         name=name,
@@ -350,9 +358,7 @@ async def send_password_reset_email(
 ) -> bool:
     """Send password reset email with reset link"""
     if not reset_url:
-        # Default reset URL (should be configured via environment variable in production)
-        base_url = os.getenv("FRONTEND_URL", "http://localhost:8000")
-        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
+        reset_url = f"{FRONTEND_URL}/reset-password.html?token={reset_token}"
     
     html_body = render_template(
         PASSWORD_RESET_EMAIL_TEMPLATE,

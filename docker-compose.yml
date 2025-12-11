@@ -30,6 +30,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@bookkeeper.com}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Bookkeeper}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_API_BASE: ${OPENAI_API_BASE:-https://openrouter.ai/api/v1}
       OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-openai/gpt-4o-mini}

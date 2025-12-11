@@ -221,6 +221,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) folder:
 | `RESEND_API_KEY` | Resend API key | Required for emails |
 | `EMAIL_FROM` | Sender email address | Optional |
 | `EMAIL_FROM_NAME` | Sender name | Optional |
+| `FRONTEND_URL` | Frontend application URL (for email links) | Optional (auto-detects `RAILWAY_STATIC_URL` on Railway, defaults to http://localhost:8000) |
 
 ### Optional Features
 
