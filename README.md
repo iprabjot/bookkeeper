@@ -156,7 +156,7 @@ bookkeeper/
 - **Migrations**: Alembic
 - **Authentication**: JWT (python-jose)
 - **Password Hashing**: bcrypt
-- **Email**: aiosmtplib
+- **Email**: Resend (aiohttp)
 - **PDF Processing**: pdfplumber
 - **OCR**: pytesseract, pdf2image (optional)
 - **AI/LLM**: CrewAI, OpenAI/OpenRouter (optional)
@@ -207,7 +207,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) folder:
 - **[Authentication Guide](docs/AUTH_COMPLETE.md)**: User authentication and management
 - **[Database Migrations](docs/ALEMBIC_SETUP.md)**: Alembic migration guide
 - **[Report Storage](docs/REPORT_STORAGE.md)**: Database-backed report system
-- **[SMTP Setup](docs/GMAIL_SMTP_SETUP.md)**: Email configuration guide
+- **[Resend Setup](docs/RESEND_SETUP.md)**: Email configuration guide
 
 ## Configuration
 
@@ -218,9 +218,9 @@ Comprehensive documentation is available in the [`docs/`](docs/) folder:
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `JWT_SECRET_KEY` | Secret key for JWT tokens | Required |
 | `OPENAI_API_KEY` | API key for AI extraction | Optional |
-| `SMTP_HOST` | SMTP server hostname | Optional |
-| `SMTP_USER` | SMTP username | Optional |
-| `SMTP_PASSWORD` | SMTP password | Optional |
+| `RESEND_API_KEY` | Resend API key | Required for emails |
+| `EMAIL_FROM` | Sender email address | Optional |
+| `EMAIL_FROM_NAME` | Sender name | Optional |
 
 ### Optional Features
 
@@ -228,7 +228,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) folder:
   - macOS: `brew install poppler tesseract`
   - Ubuntu: `sudo apt-get install poppler-utils tesseract-ocr`
 - **AI Extraction**: Set `OPENAI_API_KEY` for enhanced invoice data extraction
-- **Email**: Configure SMTP settings for user notifications
+- **Email**: Configure Resend API key for user notifications (see [Resend Setup](docs/RESEND_SETUP.md))
 
 ## Development
 
