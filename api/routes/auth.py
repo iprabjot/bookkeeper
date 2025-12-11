@@ -4,10 +4,11 @@ Authentication routes: signup, login, token refresh
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from api.schemas import (
     SignupRequest, LoginRequest, TokenResponse, RefreshTokenRequest,
-    CompanyResponse, UserResponse, VerifyEmailRequest
+    CompanyResponse, UserResponse, VerifyEmailRequest,
+    ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
 )
 from database.models import User, Company, UserRole
 from database.db import get_db
@@ -15,7 +16,7 @@ from core.auth import (
     get_password_hash, verify_password, create_access_token,
     create_refresh_token, decode_token, get_current_user
 )
-from core.email_service import send_welcome_email
+from core.email_service import send_welcome_email, send_password_reset_email, test_resend_api_key
 from core.company_manager import CompanyManager
 import secrets
 import string
@@ -129,7 +130,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
     
     # Update last login
-    user.last_login = datetime.now()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
     
     # Create tokens
@@ -297,4 +298,159 @@ async def verify_email(
     db.commit()
     
     return {"message": "Email verified successfully"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Request password reset - sends reset email
+    Always returns success to prevent email enumeration
+    """
+    user = db.query(User).filter(User.email == request.email.lower()).first()
+    
+    # Always return success to prevent email enumeration attacks
+    # Only send email if user exists
+    if user and user.is_active:
+        # Generate reset token (expires in 1 hour)
+        reset_token = create_access_token(
+            data={"sub": user.user_id, "email": user.email, "type": "password_reset"},
+            expires_delta=timedelta(hours=1)
+        )
+        
+        # Store token in database
+        user.password_reset_token = reset_token
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        db.commit()
+        
+        # Send reset email in background
+        async def send_email_background():
+            try:
+                await send_password_reset_email(
+                    to_email=user.email,
+                    name=user.name,
+                    reset_token=reset_token
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Background password reset email task failed: {e}", exc_info=True)
+        
+        background_tasks.add_task(send_email_background)
+    
+    # Always return success message (security best practice)
+    return {"message": "If an account with that email exists, a password reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Reset password using reset token from email
+    """
+    # Decode and verify token
+    payload = decode_token(request.token)
+    
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    if payload.get("type") != "password_reset":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid token type"
+        )
+    
+    user_id = int(payload.get("sub"))
+    user = db.query(User).filter(User.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Verify token matches stored token and hasn't expired
+    if user.password_reset_token != request.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token"
+        )
+    
+    if user.password_reset_expires is None or user.password_reset_expires < datetime.now(timezone.utc):
+        # Clear expired token
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired. Please request a new one."
+        )
+    
+    # Update password
+    user.password_hash = get_password_hash(request.new_password)
+    # Clear reset token
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+    
+    return {"message": "Password reset successfully"}
+
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change password for logged-in user
+    """
+    # Verify current password
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect"
+        )
+    
+    # Update password
+    current_user.password_hash = get_password_hash(request.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+@router.get("/test-email-config")
+async def test_email_config():
+    """
+    Test Resend API key configuration
+    Useful for debugging email setup issues
+    """
+    from core.email_service import RESEND_API_KEY, EMAIL_FROM, EMAIL_FROM_NAME
+    
+    if not RESEND_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="RESEND_API_KEY not configured"
+        )
+    
+    # Test the API key format
+    is_valid = await test_resend_api_key()
+    
+    return {
+        "api_key_configured": True,
+        "api_key_length": len(RESEND_API_KEY),
+        "api_key_preview": RESEND_API_KEY[:10] + "..." if len(RESEND_API_KEY) > 10 else "SHORT",
+        "api_key_valid": is_valid,
+        "email_from": EMAIL_FROM,
+        "email_from_name": EMAIL_FROM_NAME,
+        "message": "API key format is valid" if is_valid else "API key format is invalid. Keys should start with 're_'"
+    }
 

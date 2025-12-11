@@ -55,10 +55,10 @@ async function refreshAccessToken() {
 }
 
 async function apiRequest(endpoint, options = {}) {
-    // Skip auth for public endpoints (login, signup, refresh, verify-email)
-    // Protected auth endpoints: /auth/me, /auth/send-verification-email
-    const publicEndpoints = ['/auth/login', '/auth/signup', '/auth/refresh', '/auth/verify-email', '/health'];
-    const protectedAuthEndpoints = ['/auth/me', '/auth/send-verification-email'];
+    // Skip auth for public endpoints (login, signup, refresh, verify-email, forgot-password, reset-password)
+    // Protected auth endpoints: /auth/me, /auth/send-verification-email, /auth/change-password
+    const publicEndpoints = ['/auth/login', '/auth/signup', '/auth/refresh', '/auth/verify-email', '/auth/forgot-password', '/auth/reset-password', '/health'];
+    const protectedAuthEndpoints = ['/auth/me', '/auth/send-verification-email', '/auth/change-password'];
     const isPublicEndpoint = publicEndpoints.includes(endpoint) || 
                             (endpoint.startsWith('/auth/') && !protectedAuthEndpoints.includes(endpoint));
     
@@ -212,6 +212,30 @@ async function getCurrentUser() {
 function logout() {
     clearTokens();
     window.location.href = 'login.html';
+}
+
+async function forgotPassword(email) {
+    return apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+    });
+}
+
+async function resetPassword(token, newPassword) {
+    return apiRequest('/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, new_password: newPassword })
+    });
+}
+
+async function changePassword(currentPassword, newPassword) {
+    return apiRequest('/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+    });
 }
 
 async function getStatus() {
@@ -511,4 +535,7 @@ window.updateUser = updateUser;
 window.deleteUser = deleteUser;
 window.sendVerificationEmail = sendVerificationEmail;
 window.verifyEmail = verifyEmail;
+window.forgotPassword = forgotPassword;
+window.resetPassword = resetPassword;
+window.changePassword = changePassword;
 
