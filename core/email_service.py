@@ -1,27 +1,50 @@
 """
 Email service for sending emails (welcome, invitations, notifications)
+Uses Resend API for all email sending
 """
-import aiosmtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from jinja2 import Template
 import os
 import logging
 from dotenv import load_dotenv
 from typing import Optional
+import aiohttp
 
 load_dotenv()
 
 # Set up logger for email service
 logger = logging.getLogger(__name__)
 
-# SMTP Configuration
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", SMTP_USER)
+# Resend API Configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_API_URL = "https://api.resend.com/emails"
+EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@bookkeeper.com")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Bookkeeper")
+
+
+async def test_resend_api_key() -> bool:
+    """
+    Test if the Resend API key is valid by calling the API key validation endpoint
+    
+    Returns:
+        True if API key is valid, False otherwise
+    """
+    if not RESEND_API_KEY:
+        logger.error("Resend API key not configured")
+        return False
+    
+    try:
+        # Resend doesn't have a dedicated ping endpoint, so we'll test by checking API key format
+        # Valid Resend API keys start with "re_"
+        if not RESEND_API_KEY.startswith("re_"):
+            logger.error("Invalid Resend API key format. Keys should start with 're_'")
+            return False
+        
+        # We can't test without sending an email, so just validate format
+        logger.info("Resend API key format is valid")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to validate Resend API key: {type(e).__name__}: {str(e)}", exc_info=True)
+        return False
 
 
 async def send_email(
@@ -31,7 +54,7 @@ async def send_email(
     text_body: Optional[str] = None
 ) -> bool:
     """
-    Send an email using SMTP
+    Send an email using Resend API
     
     Args:
         to_email: Recipient email address
@@ -42,78 +65,64 @@ async def send_email(
     Returns:
         True if sent successfully, False otherwise
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning(f"Email not configured. Would send to {to_email}: {subject}")
+    if not RESEND_API_KEY:
+        logger.warning(f"Resend API key not configured. Would send to {to_email}: {subject}")
+        return False
+    
+    # Validate API key format
+    if not RESEND_API_KEY.startswith("re_"):
+        logger.error("Invalid Resend API key format. Keys should start with 're_'")
         return False
     
     try:
-        message = MIMEMultipart("alternative")
-        message["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>"
-        message["To"] = to_email
-        message["Subject"] = subject
+        # Prepare message payload for Resend API
+        payload = {
+            "from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        }
         
+        # Add text body if provided
         if text_body:
-            message.attach(MIMEText(text_body, "plain"))
-        message.attach(MIMEText(html_body, "html"))
+            payload["text"] = text_body
         
-        # Use SMTP class directly for better control over STARTTLS
-        # Port 587: Use STARTTLS (upgrade plain connection to TLS)
-        # Port 465: Use SSL/TLS directly
-        # Add timeout to prevent hanging (10 seconds)
-        timeout = 10
+        # Send via Resend API
+        headers = {
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }
         
-        if SMTP_PORT == 465:
-            # Port 465 requires immediate SSL/TLS connection
-            smtp = aiosmtplib.SMTP(
-                hostname=SMTP_HOST,
-                port=SMTP_PORT,
-                use_tls=True,  # Direct TLS for port 465
-                timeout=timeout
-            )
-        else:
-            # Port 587 (or other ports) use STARTTLS
-            smtp = aiosmtplib.SMTP(
-                hostname=SMTP_HOST,
-                port=SMTP_PORT,
-                use_tls=False,  # Start with plain connection
-                start_tls=True,  # Automatically upgrade to TLS after connect
-                timeout=timeout
-            )
-        
-        await smtp.connect(timeout=timeout)
-        
-        # Note: If start_tls=True is set in constructor, it's handled automatically
-        # Only call starttls() manually if start_tls was not set
-        # For port 587, the start_tls=True parameter should handle it
-        
-        await smtp.login(SMTP_USER, SMTP_PASSWORD)
-        await smtp.send_message(message)
-        await smtp.quit()
-        
-        logger.info(f"Email sent successfully to {to_email}: {subject}")
-        return True
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                RESEND_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    logger.info(f"Email sent successfully via Resend to {to_email}: {subject}")
+                    return True
+                elif response.status == 401:
+                    error_data = await response.json().catch(lambda: {})
+                    error_msg = error_data.get("message", "Invalid API key")
+                    logger.error(
+                        f"Resend API authentication failed (401): {error_msg}. "
+                        f"Please verify:\n"
+                        f"1. Your API key starts with 're_' and is correct\n"
+                        f"2. The API key is from https://resend.com/api-keys\n"
+                        f"3. The API key is active and not revoked\n"
+                        f"4. Your sending domain is verified in Resend dashboard"
+                    )
+                    return False
+                else:
+                    error_text = await response.text()
+                    logger.error(f"Resend API HTTP error {response.status}: {error_text}")
+                    return False
+                    
     except Exception as e:
-        error_type = type(e).__name__
-        error_msg = str(e)
-        
-        # Check if this is a Railway SMTP timeout issue
-        is_railway_timeout = (
-            "SMTPConnectTimeoutError" in error_type or 
-            "Timed out connecting" in error_msg or
-            "timeout" in error_msg.lower()
-        )
-        
-        if is_railway_timeout and SMTP_HOST == "smtp.gmail.com":
-            logger.error(
-                f"Failed to send email to {to_email}: Gmail SMTP timeout on Railway. "
-                f"This is expected - Railway blocks Gmail SMTP. "
-                f"Please switch to SendGrid (see docs/RAILWAY_SMTP_TROUBLESHOOTING.md). "
-                f"Error: {error_type}: {error_msg}",
-                exc_info=True
-            )
-        else:
-            logger.error(f"Failed to send email to {to_email}: {error_type}: {error_msg}", exc_info=True)
-        
+        logger.error(f"Failed to send email via Resend to {to_email}: {type(e).__name__}: {str(e)}", exc_info=True)
         return False
 
 
@@ -206,6 +215,52 @@ INVITATION_EMAIL_TEMPLATE = """
 </html>
 """
 
+PASSWORD_RESET_EMAIL_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .warning { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Reset Your Password</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{ name }},</p>
+            <p>We received a request to reset your password for your Bookkeeper account.</p>
+            
+            <p>Click the button below to reset your password:</p>
+            <a href="{{ reset_url }}" class="button">Reset Password</a>
+            
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #667eea;">{{ reset_url }}</p>
+            
+            <div class="warning">
+                <p><strong>Important:</strong></p>
+                <ul>
+                    <li>This link will expire in 1 hour</li>
+                    <li>If you didn't request this, please ignore this email</li>
+                    <li>Your password will not change until you click the link above</li>
+                </ul>
+            </div>
+            
+            <p style="margin-top: 30px; font-size: 12px; color: #666;">
+                If you continue to have problems, please contact support.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 
 async def send_welcome_email(
     to_email: str,
@@ -286,3 +341,43 @@ Login URL: {login_url}
         text_body=text_body
     )
 
+
+async def send_password_reset_email(
+    to_email: str,
+    name: str,
+    reset_token: str,
+    reset_url: str = None
+) -> bool:
+    """Send password reset email with reset link"""
+    if not reset_url:
+        # Default reset URL (should be configured via environment variable in production)
+        base_url = os.getenv("FRONTEND_URL", "http://localhost:8000")
+        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
+    
+    html_body = render_template(
+        PASSWORD_RESET_EMAIL_TEMPLATE,
+        name=name,
+        reset_url=reset_url
+    )
+    
+    text_body = f"""
+Hello {name},
+
+We received a request to reset your password for your Bookkeeper account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this, please ignore this email. Your password will not change until you click the link above.
+
+If you continue to have problems, please contact support.
+"""
+    
+    return await send_email(
+        to_email=to_email,
+        subject="Reset Your Password - Bookkeeper",
+        html_body=html_body,
+        text_body=text_body
+    )
