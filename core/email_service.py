@@ -19,8 +19,24 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_API_URL = "https://api.resend.com/emails"
 EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@bookkeeper.com")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Bookkeeper")
+
+def get_frontend_url() -> str:
+    """
+    Get the frontend URL for email links.
+    Checks RAILWAY_STATIC_URL first, then FRONTEND_URL, then defaults to localhost.
+    Ensures the URL has a protocol (https:// for Railway, http:// for localhost).
+    """
+    url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("FRONTEND_URL", "http://localhost:8000")
+    
+    # If URL doesn't start with http:// or https://, prepend https://
+    # (Railway URLs should use https://)
+    if url and not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+    
+    return url
+
 # Frontend URL: Check Railway's RAILWAY_STATIC_URL first, then FRONTEND_URL, then default to localhost
-FRONTEND_URL = os.getenv("RAILWAY_STATIC_URL") or os.getenv("FRONTEND_URL", "http://localhost:8000")
+FRONTEND_URL = get_frontend_url()
 
 
 async def test_resend_api_key() -> bool:

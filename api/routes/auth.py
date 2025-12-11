@@ -215,6 +215,12 @@ async def send_verification_email(
         
         # Get frontend URL: Check Railway's RAILWAY_STATIC_URL first, then FRONTEND_URL, then default to localhost
         frontend_url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("FRONTEND_URL", "http://localhost:8000")
+        
+        # If URL doesn't start with http:// or https://, prepend https://
+        # (Railway URLs should use https://)
+        if frontend_url and not frontend_url.startswith(("http://", "https://")):
+            frontend_url = f"https://{frontend_url}"
+        
         verification_url = f"{frontend_url}/verify-email.html?token={verification_token}"
         
         html_body = render_template("""
