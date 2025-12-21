@@ -1,6 +1,8 @@
 agent: journal_entry_agent
 description: >
-  Create double-entry journal entries for the extracted financial data.
+  Create double-entry journal entries following Indian Accounting Standards (Ind AS)
+  from two primary sources: (1) Invoice-based transactions and (2) Bank statement 
+  transactions (both reconciled and unreconciled).
   
   CHART OF ACCOUNTS:
   {chart_of_accounts}
@@ -8,55 +10,365 @@ description: >
   EXTRACTED DATA:
   {extracted_data}
   
-  FOR EACH TRANSACTION:
-  1. Identify the nature of transaction
-  2. Determine applicable accounts from Chart of Accounts
-  3. Calculate GST treatment:
-     - B2B Intra-state: CGST + SGST (each 50% of GST rate)
-     - B2B Inter-state: IGST (full GST rate)
-     - Check for reverse charge applicability
-  4. Apply TDS if applicable (check vendor TDS category)
-  5. Create balanced journal entry (DR = CR)
-  6. Write clear narration
+  BANK TRANSACTIONS (if provided):
+  {bank_transactions}
   
-  VALIDATION RULES:
-  - Total Debits MUST equal Total Credits
-  - All account codes must exist in Chart of Accounts
-  - GST must be correctly split (CGST/SGST or IGST)
-  - High value transactions (> ₹1,00,000) need human approval
-  - New vendors need human approval
+  UNRECONCILED BANK TRANSACTIONS (Stray Entries):
+  {unreconciled_bank_transactions}
   
-  OUTPUT FORMAT (JSON):
+  ============================================
+  INPUT TYPE 1: INVOICE-BASED TRANSACTIONS
+  ============================================
+  
+  Document Types: SALES_INVOICE | PURCHASE_INVOICE | CREDIT_NOTE | DEBIT_NOTE | EXPENSE
+  
+  1.1 SALES INVOICE ENTRY:
+  - Determine GST type: Same state → CGST+SGST, Different state → IGST
+  - Entry Structure:
+    Dr. [Party Account - Debtor]           → Total Invoice Amount
+        Cr. Sales - [Product/Service]      → Taxable Value
+        Cr. CGST Output @ X%               → CGST (if intra-state)
+        Cr. SGST Output @ X%               → SGST (if intra-state)
+        Cr. IGST Output @ X%               → IGST (if inter-state)
+  - If TDS applicable (customer deducts):
+    Dr. [Party Account - Debtor]           → Invoice Amount - TDS
+    Dr. TDS Receivable - Sec [XXX]         → TDS Amount
+        Cr. Sales + GST Output
+  - Narration: "Being goods/services sold to [Party] vide Invoice No. [Number] 
+    dated [Date]. [Credit Period] days credit. Due on [Due Date]."
+  
+  1.2 PURCHASE INVOICE ENTRY:
+  - Determine account: Stock → Purchase, Assets → Asset Account, Expenses → Expense Account
+  - Check Reverse Charge Mechanism (RCM) applicability
+  - Entry Structure (Normal):
+    Dr. Purchase/Expense/Asset Account     → Taxable Value
+    Dr. CGST Input @ X%                    → CGST Amount
+    Dr. SGST Input @ X%                    → SGST Amount
+        Cr. [Party Account - Creditor]     → Total Invoice Amount
+  - Entry Structure (with TDS deduction by us):
+    Dr. Purchase/Expense Account           → Taxable Value
+    Dr. CGST Input @ X%                    → CGST Amount
+    Dr. SGST Input @ X%                    → SGST Amount
+        Cr. [Party Account - Creditor]     → Invoice Amount - TDS
+        Cr. TDS Payable - Sec [XXX]        → TDS Amount
+  - Entry Structure (Reverse Charge):
+    Dr. Purchase/Expense Account           → Taxable Value
+    Dr. CGST Input (RCM) @ X%              → CGST Amount
+    Dr. SGST Input (RCM) @ X%              → SGST Amount
+        Cr. [Party Account - Creditor]     → Taxable Value (net of GST)
+        Cr. CGST Output (RCM) @ X%         → CGST Amount
+        Cr. SGST Output (RCM) @ X%         → SGST Amount
+  - Narration: "Being goods/services purchased from [Party] vide their Invoice No. 
+    [Number] dated [Date]. [If RCM: GST under Reverse Charge Mechanism.] 
+    Payment due on [Due Date]."
+  
+  1.3 CREDIT NOTE ENTRY (Sales Return):
+  - Reverse the original sales entry
+  - Entry Structure:
+    Dr. Sales Return / Sales (Contra)      → Taxable Value
+    Dr. CGST Output @ X%                   → CGST Amount (reversal)
+    Dr. SGST Output @ X%                   → SGST Amount (reversal)
+        Cr. [Party Account - Debtor]      → Total Credit Note Amount
+  - Narration: "Being Credit Note No. [Number] issued to [Party] for sales return 
+    / rate difference against original Invoice No. [Original Invoice]."
+  
+  1.4 DEBIT NOTE ENTRY (Purchase Return):
+  - Reverse the original purchase entry
+  - Entry Structure:
+    Dr. [Party Account - Creditor]          → Total Debit Note Amount
+        Cr. Purchase Return / Purchase     → Taxable Value
+        Cr. CGST Input @ X%                → CGST Amount (reversal)
+        Cr. SGST Input @ X%                → SGST Amount (reversal)
+  - Narration: "Being Debit Note No. [Number] raised on [Party] for purchase return 
+    / rate difference against their Invoice No. [Original Invoice]."
+  
+  ============================================
+  INPUT TYPE 2: BANK TRANSACTION ENTRIES
+  ============================================
+  
+  2.1 RECONCILED RECEIPT (Customer Payment):
+  Sub-cases:
+  
+  2.1.1 Full Payment - Single Invoice:
+  - Entry Structure:
+    Dr. Bank Account                       → Receipt Amount
+        Cr. [Customer - Debtor]            → Receipt Amount
+  - Bill-wise: Against Invoice [Inv No.] - Full Settlement
+  
+  2.1.2 Partial Payment - Single Invoice:
+  - Entry Structure (SPECIAL: 1 Debit, 2 Credit lines - as per requirement):
+    Dr. Bank Account                       → Receipt Amount (₹X)
+        Cr. [Customer - Debtor]            → Principal Portion (₹Y - taxable value proportion)
+        Cr. GST Output Account             → GST Portion (₹X - ₹Y - CGST/SGST/IGST based on invoice)
+  - Note: This structure uses 1 Debit (Bank) + 2 Credit (Debtors + GST) as specified
+  - When money is received: Bank is debited (asset increases), Debtors credited (reduces receivable), GST Output credited (reduces liability)
+  - Calculate payment ratio: Payment Amount / Invoice Amount
+  - Principal portion = Taxable Value × Payment Ratio
+  - GST portion = Total GST × Payment Ratio (or remaining amount after principal)
+  - For intra-state: Use "CGST/SGST Output (Settlement)" account
+  - For inter-state: Use "IGST Output (Settlement)" account
+  - If no GST in invoice: Use "Suspense - Payment Allocation" for review
+  - Bill-wise: Against Invoice [Inv No.] - Partial (₹X of ₹Y)
+  - Outstanding after: ₹Z
+  - Narration: "Being part payment (X%) received from [Party] via [Mode] 
+    Ref: [UTR] against Invoice [Inv No.]. Balance outstanding: ₹Z."
+  
+  2.1.3 Payment Against Multiple Invoices:
+  - Entry Structure:
+    Dr. Bank Account                       → Total Receipt Amount
+        Cr. [Customer - Debtor]            → Total Receipt Amount
+  - Bill-wise Allocation:
+    - Invoice [Inv1]: ₹X (Full/Partial)
+    - Invoice [Inv2]: ₹Y (Full/Partial)
+    - Invoice [Inv3]: ₹Z (Full/Partial)
+  
+  2.1.4 Advance Receipt (No Invoice):
+  - Entry Structure:
+    Dr. Bank Account                       → Receipt Amount
+        Cr. Advance from Customers         → Receipt Amount (excl. GST)
+        Cr. CGST Output on Advance @ X%    → CGST Amount
+        Cr. SGST Output on Advance @ X%    → SGST Amount
+  - Note: GST on advance applicable for goods (not services)
+  
+  2.2 RECONCILED PAYMENT (Vendor Payment):
+  Sub-cases mirror receipts:
+  
+  2.2.1 Full Payment - Single Invoice:
+  - Entry Structure:
+    Dr. [Vendor - Creditor]                → Payment Amount
+        Cr. Bank Account                   → Payment Amount
+  - Bill-wise: Against Invoice [Vendor Inv No.] - Full Settlement
+  
+  2.2.2 Partial Payment:
+  - Entry Structure (SPECIAL: 1 Debit, 2 Credit lines):
+    Dr. Bank Account                       → Payment Amount (₹X)
+        Cr. [Vendor - Creditor]            → Principal Portion (₹Y - taxable value proportion)
+        Cr. GST Input Account              → GST Portion (₹X - ₹Y - CGST/SGST/IGST based on invoice)
+  - Note: When money is paid, Bank is debited (asset decreases)
+  - Creditors are credited (liability decreases - we owe less)
+  - GST Input is credited (asset decreases - GST input credit reduces)
+  - Calculate payment ratio: Payment Amount / Invoice Amount
+  - Principal portion = Taxable Value × Payment Ratio
+  - GST portion = Total GST × Payment Ratio (or remaining amount after principal)
+  - For intra-state: Use "CGST/SGST Input (Settlement)" account
+  - For inter-state: Use "IGST Input (Settlement)" account
+  - If no GST in invoice: Use "Suspense - Payment Allocation" for review
+  - Bill-wise: Against Invoice [Vendor Inv No.] - Partial (₹X of ₹Y)
+  - Outstanding after: ₹Z
+  - Narration: "Being part payment (X%) made to [Party] via [Mode] 
+    Ref: [UTR] against their Invoice [Inv No.]. Balance outstanding: ₹Z."
+  
+  2.2.3 Payment with TDS Deduction:
+  - Entry Structure:
+    Dr. [Vendor - Creditor]                → Gross Amount (Invoice Amount)
+        Cr. Bank Account                   → Net Payment (Invoice - TDS)
+        Cr. TDS Payable - Sec [XXX]        → TDS Amount
+  - Note: TDS entry may already exist at invoice booking
+  
+  2.2.4 Advance to Vendor:
+  - Entry Structure:
+    Dr. Advance to Suppliers               → Payment Amount
+        Cr. Bank Account                   → Payment Amount
+  
+  2.3 UNRECONCILED BANK TRANSACTIONS:
+  Use categorization to determine entry:
+  
+  2.3.1 Categorized with High Confidence:
+  - Direct expenses (no invoice expected):
+    Dr. [Expense Account]                  → Amount
+        Cr. Bank Account                   → Amount
+  - Categorized income:
+    Dr. Bank Account                       → Amount
+        Cr. [Income Account]               → Amount
+  - Narration: "Being [Category] via [Mode] Ref: [UTR]. 
+    Auto-categorized - pending review."
+  
+  2.3.2 Categorized with Low/Medium Confidence:
+  - Use suspense accounts:
+    Dr. Suspense - Unallocated Payments    → Amount
+        Cr. Bank Account                   → Amount
+  - Narration: "Being payment to [Extracted Party] via [Mode] Ref: [UTR]. 
+    PENDING CATEGORIZATION - requires invoice/approval."
+  - Flag: REVIEW_REQUIRED
+  
+  2.3.3 Internal Transfers:
+  - Entry Structure:
+    Dr. [Destination Bank Account / FD]    → Amount
+        Cr. [Source Bank Account]          → Amount
+  - Narration: "Being internal transfer from [Source] to [Destination] 
+    Ref: [UTR]. No P&L impact."
+  
+  2.4 SPECIAL BANK TRANSACTIONS:
+  
+  2.4.1 Bank Charges:
+  - Entry Structure:
+    Dr. Bank Charges                       → Base Amount
+    Dr. CGST Input @ 9%                    → CGST Amount
+    Dr. SGST Input @ 9%                    → SGST Amount
+        Cr. Bank Account                   → Total Amount
+  - Narration: "Being bank charges for [Month/Service] including GST."
+  
+  2.4.2 EMI Payment (Loan):
+  - Entry Structure:
+    Dr. Term Loan - [Bank]                 → Principal Portion
+    Dr. Interest on Term Loan              → Interest Portion
+        Cr. Bank Account                   → Total EMI Amount
+  - Narration: "Being EMI payment for [Loan Type] Loan A/c [Number]. 
+    Principal: ₹X, Interest: ₹Y (as per amortization schedule)."
+  
+  2.4.3 Salary Payment:
+  - Entry Structure:
+    Dr. Salaries & Wages                   → Gross Salary
+        Cr. Bank Account                   → Net Salary
+        Cr. TDS Payable - Salary           → TDS Amount
+        Cr. PF Payable (Employee)          → PF Amount
+        Cr. ESI Payable (Employee)         → ESI Amount
+        Cr. Professional Tax Payable       → PT Amount
+  - Narration: "Being net salary paid for [Month Year]. 
+    Gross: ₹X. Deductions: TDS ₹Y, PF ₹Z, ESI ₹A, PT ₹B."
+  
+  2.4.4 GST Payment:
+  - Entry Structure:
+    Dr. CGST Output                        → CGST Amount
+    Dr. SGST Output                        → SGST Amount
+        Cr. Bank Account                   → Total GST Payment
+  - Narration: "Being GST payment for [Month/Quarter] vide Challan [Number] 
+    dated [Date]. GSTN Ref: [Reference]."
+  
+  2.4.5 TDS Payment:
+  - Entry Structure:
+    Dr. TDS Payable - Sec [XXX]            → TDS Amount (per section)
+    Dr. TDS Payable - Sec [YYY]              → TDS Amount (per section)
+        Cr. Bank Account                   → Total TDS Payment
+  - Narration: "Being TDS payment for [Month] u/s [Sections] 
+    vide Challan CIN [Number]."
+  
+  ============================================
+  VALIDATION RULES
+  ============================================
+  
+  Pre-Posting Validation:
+  1. Balancing Check: SUM(debits) == SUM(credits) - If not balanced → REJECT
+  2. Account Code Validation: All codes must exist in Chart of Accounts
+  3. Party Validation: Debtor/Creditor entries require party in master
+  4. GST Validation: Tax amount = Taxable Value × Tax Rate (within ₹1 tolerance)
+  5. Date Validation: Entry date cannot be in locked period, should be ≤ current date
+  6. Duplicate Check: Same invoice number/UTR should not create duplicate entry
+  
+  Review Triggers (Flag requires_review: true):
+  - Amount > ₹5,00,000 → High value transaction
+  - New party (first transaction) → New vendor/customer verification
+  - Unusual account combination → Account pairing not seen before
+  - Confidence < 0.7 → Low categorization confidence
+  - GST rate mismatch → Tax rate differs from HSN default
+  - Round amount + end of month → Potential provision/accrual
+  - Same party, same day, same amount → Potential duplicate
+  - Negative outstanding after allocation → Over-payment detected
+  - Foreign currency transaction → Forex rate verification
+  - RCM triggered → Reverse charge applicability check
+  
+  ============================================
+  OUTPUT FORMAT (JSON)
+  ============================================
+  
   {
     "journal_entries": [
       {
-        "entry_id": "JE-2025-001",
-        "date": "2025-11-27",
-        "narration": "Purchase of office supplies from Amazon India",
-        "reference": "INV-AMZ-12345",
-        "lines": [
-          {"account_code": "5100", "account_name": "Office Supplies", "debit": 5000, "credit": 0},
-          {"account_code": "2310", "account_name": "CGST Input", "debit": 450, "credit": 0},
-          {"account_code": "2320", "account_name": "SGST Input", "debit": 450, "credit": 0},
-          {"account_code": "3100", "account_name": "Accounts Payable", "debit": 0, "credit": 5900}
+        "entry_id": "JE-2025-00001",
+        "entry_date": "YYYY-MM-DD",
+        "entry_type": "SALES | PURCHASE | RECEIPT | PAYMENT | CONTRA | JOURNAL",
+        "source_type": "INVOICE | BANK_TRANSACTION | MANUAL",
+        "source_reference": {
+          "document_type": "string",
+          "document_number": "string",
+          "document_date": "YYYY-MM-DD"
+        },
+        "line_items": [
+          {
+            "line_number": 1,
+            "account_code": "string",
+            "account_name": "string",
+            "debit": "number | null",
+            "credit": "number | null",
+            "party_name": "string | null",
+            "cost_center": "string | null",
+            "bill_allocation": [
+              {
+                "invoice_number": "string",
+                "invoice_date": "YYYY-MM-DD",
+                "allocated_amount": "number",
+                "allocation_type": "FULL | PARTIAL",
+                "outstanding_before": "number",
+                "outstanding_after": "number"
+              }
+            ] | null
+          }
         ],
-        "total_debit": 5900,
-        "total_credit": 5900,
-        "status": "auto_approved|pending_approval",
-        "approval_reason": null,
-        "confidence": 0.96
+        "total_debit": "number",
+        "total_credit": "number",
+        "is_balanced": "boolean",
+        "narration": "string",
+        "tags": ["string"],
+        "flags": {
+          "requires_review": "boolean",
+          "review_reason": "string | null",
+          "is_recurring": "boolean",
+          "is_reversal": "boolean",
+          "related_entry_id": "string | null"
+        },
+        "audit_trail": {
+          "created_by": "journal_entry_agent",
+          "created_at": "ISO timestamp",
+          "confidence_score": "number (0-1)",
+          "source_signals": ["string"]
+        }
       }
     ],
     "summary": {
-      "total_entries": 12,
-      "auto_approved": 10,
-      "pending_approval": 2,
-      "total_debit_amount": 482350,
-      "total_credit_amount": 482350
+      "total_entries": "number",
+      "auto_approved": "number",
+      "pending_approval": "number",
+      "partial_payments": "number",
+      "stray_entries": "number",
+      "total_debit_amount": "number",
+      "total_credit_amount": "number"
     }
   }
+  
+  ============================================
+  ERROR HANDLING
+  ============================================
+  
+  Error Response Format:
+  {
+    "error": true,
+    "error_code": "string",
+    "error_message": "string",
+    "error_details": {
+      "field": "string",
+      "expected": "string",
+      "received": "string"
+    },
+    "partial_entry": { } | null,
+    "suggested_action": "string"
+  }
+  
+  Error Codes:
+  - ERR_UNBALANCED: Debits ≠ Credits → Check amounts and recalculate
+  - ERR_INVALID_ACCOUNT: Account code not in CoA → Map to valid account or create new
+  - ERR_MISSING_PARTY: Party not found in master → Create party first
+  - ERR_DUPLICATE_REF: Reference already posted → Skip or mark as duplicate
+  - ERR_LOCKED_PERIOD: Period is closed → Get period unlock approval
+  - ERR_GST_MISMATCH: Tax calculation error → Verify tax rate and amounts
+  - ERR_INSUFFICIENT_DATA: Required fields missing → Provide mandatory fields
+  
 expected_output: >
   A JSON object containing balanced journal entries ready for posting,
-  with entries requiring approval clearly flagged.
+  with entries requiring approval clearly flagged. Partial payments must
+  have exactly 1 credit and 2 debit lines (for receipts) or 1 debit and 2 credit 
+  lines (for payments). Unreconciled bank transactions should be included with 
+  appropriate account allocation. All entries must follow Indian Accounting 
+  Standards (Ind AS) with proper GST treatment.
 context:
   - ingest_financial_data
+  - reconcile_bank_transactions
