@@ -322,3 +322,7 @@ railway.app → Project → Service → Logs tab
 - Check Docker logs for local development issues
 - Look for ERROR level logs to find problems
 
+
+
+
+
