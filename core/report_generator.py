@@ -67,9 +67,17 @@ def regenerate_csvs(company_id: Optional[int] = None, user_id: Optional[int] = N
                 JournalEntryLine.entry_id == entry.entry_id
             ).all()
             
+            # Format date to readable format (DD-MMM-YYYY)
+            formatted_date = None
+            if entry.date:
+                try:
+                    formatted_date = entry.date.strftime("%d-%b-%Y")
+                except:
+                    formatted_date = entry.date.isoformat() if entry.date else None
+            
             entry_dict = {
                 "entry_id": f"JE-{entry.entry_id}",
-                "date": entry.date.isoformat() if entry.date else None,
+                "date": formatted_date or (entry.date.isoformat() if entry.date else None),
                 "narration": entry.narration,
                 "reference": entry.reference,
                 "lines": [

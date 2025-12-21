@@ -34,13 +34,22 @@ def generate_journal_entries_csv_string(journal_entries_data):
         date = entry.get("date", "")
         lines = entry.get("lines", [])
         
-        # Format date
+        # Format date to readable format (DD-MMM-YYYY)
         if date:
             try:
-                dt = datetime.strptime(date, "%Y-%m-%d")
-                date = dt.strftime("%d-%m-%Y")
+                # Try ISO format first
+                if 'T' in date:
+                    dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.strptime(date, "%Y-%m-%d")
+                date = dt.strftime("%d-%b-%Y")  # e.g., "14-Feb-2025"
             except:
-                pass
+                try:
+                    # Try other formats
+                    dt = datetime.strptime(date, "%d-%m-%Y")
+                    date = dt.strftime("%d-%b-%Y")
+                except:
+                    pass  # Keep original if can't parse
         
         debit_accounts = [(line.get("account_name", ""), line.get("debit", 0)) 
                           for line in lines if line.get("debit", 0) > 0]
@@ -144,12 +153,22 @@ def generate_ledger_csv_string(ledger_name, journal_entries_data):
         narration = entry.get("narration", "")
         reference = entry.get("reference", "")
         
+        # Format date to readable format (DD-MMM-YYYY)
         if date:
             try:
-                dt = datetime.strptime(date, "%Y-%m-%d")
-                date = dt.strftime("%d-%m-%Y")
+                # Try ISO format first
+                if 'T' in date:
+                    dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.strptime(date, "%Y-%m-%d")
+                date = dt.strftime("%d-%b-%Y")  # e.g., "14-Feb-2025"
             except:
-                pass
+                try:
+                    # Try other formats
+                    dt = datetime.strptime(date, "%d-%m-%Y")
+                    date = dt.strftime("%d-%b-%Y")
+                except:
+                    pass  # Keep original if can't parse
         
         for line in entry.get("lines", []):
             if line.get("account_name", "") == ledger_name:
