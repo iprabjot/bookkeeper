@@ -73,3 +73,6 @@ dmypy.json
 
 storage/
 # Local file storage (persistent)
+
+# Scripts
+scripts/
