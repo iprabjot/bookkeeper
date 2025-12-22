@@ -96,31 +96,27 @@ description: >
   - Bill-wise: Against Invoice [Inv No.] - Full Settlement
   
   2.1.2 Partial Payment - Single Invoice:
-  - Entry Structure (SPECIAL: 1 Debit, 2 Credit lines - as per requirement):
+  - Entry Structure (Simple: 1 Debit, 1 Credit):
     Dr. Bank Account                       → Receipt Amount (₹X)
-        Cr. [Customer - Debtor]            → Principal Portion (₹Y - taxable value proportion)
-        Cr. GST Output Account             → GST Portion (₹X - ₹Y - CGST/SGST/IGST based on invoice)
-  - Note: This structure uses 1 Debit (Bank) + 2 Credit (Debtors + GST) as specified
-  - When money is received: Bank is debited (asset increases), Debtors credited (reduces receivable), GST Output credited (reduces liability)
-  - Calculate payment ratio: Payment Amount / Invoice Amount
-  - Principal portion = Taxable Value × Payment Ratio
-  - GST portion = Total GST × Payment Ratio (or remaining amount after principal)
-  - For intra-state: Use "CGST/SGST Output (Settlement)" account
-  - For inter-state: Use "IGST Output (Settlement)" account
-  - If no GST in invoice: Use "Suspense - Payment Allocation" for review
+        Cr. [Customer - Debtor]            → Receipt Amount (₹X)
+  - Note: GST is not considered in payment entries. GST is accounted for when the invoice is created.
+  - Simply track the received amount - no GST calculations or allocations needed.
+  - Multiple partial payments can be made against the same invoice - each payment creates a separate entry.
   - Bill-wise: Against Invoice [Inv No.] - Partial (₹X of ₹Y)
   - Outstanding after: ₹Z
-  - Narration: "Being part payment (X%) received from [Party] via [Mode] 
+  - Narration: "Being part payment of ₹X received from [Party] via [Mode] 
     Ref: [UTR] against Invoice [Inv No.]. Balance outstanding: ₹Z."
   
   2.1.3 Payment Against Multiple Invoices:
   - Entry Structure:
     Dr. Bank Account                       → Total Receipt Amount
         Cr. [Customer - Debtor]            → Total Receipt Amount
+  - Note: GST is not considered in payment entries. Simply track the total amount received.
   - Bill-wise Allocation:
     - Invoice [Inv1]: ₹X (Full/Partial)
     - Invoice [Inv2]: ₹Y (Full/Partial)
     - Invoice [Inv3]: ₹Z (Full/Partial)
+  - Multiple partial payments can be recorded against any combination of invoices.
   
   2.1.4 Advance Receipt (No Invoice):
   - Entry Structure:
@@ -140,22 +136,15 @@ description: >
   - Bill-wise: Against Invoice [Vendor Inv No.] - Full Settlement
   
   2.2.2 Partial Payment:
-  - Entry Structure (SPECIAL: 1 Debit, 2 Credit lines):
-    Dr. Bank Account                       → Payment Amount (₹X)
-        Cr. [Vendor - Creditor]            → Principal Portion (₹Y - taxable value proportion)
-        Cr. GST Input Account              → GST Portion (₹X - ₹Y - CGST/SGST/IGST based on invoice)
-  - Note: When money is paid, Bank is debited (asset decreases)
-  - Creditors are credited (liability decreases - we owe less)
-  - GST Input is credited (asset decreases - GST input credit reduces)
-  - Calculate payment ratio: Payment Amount / Invoice Amount
-  - Principal portion = Taxable Value × Payment Ratio
-  - GST portion = Total GST × Payment Ratio (or remaining amount after principal)
-  - For intra-state: Use "CGST/SGST Input (Settlement)" account
-  - For inter-state: Use "IGST Input (Settlement)" account
-  - If no GST in invoice: Use "Suspense - Payment Allocation" for review
+  - Entry Structure (Simple: 1 Debit, 1 Credit):
+    Dr. [Vendor - Creditor]                → Payment Amount (₹X)
+        Cr. Bank Account                   → Payment Amount (₹X)
+  - Note: GST is not considered in payment entries. GST is accounted for when the invoice is created.
+  - Simply track the paid amount - no GST calculations or allocations needed.
+  - Multiple partial payments can be made against the same invoice - each payment creates a separate entry.
   - Bill-wise: Against Invoice [Vendor Inv No.] - Partial (₹X of ₹Y)
   - Outstanding after: ₹Z
-  - Narration: "Being part payment (X%) made to [Party] via [Mode] 
+  - Narration: "Being part payment of ₹X made to [Party] via [Mode] 
     Ref: [UTR] against their Invoice [Inv No.]. Balance outstanding: ₹Z."
   
   2.2.3 Payment with TDS Deduction:
@@ -364,11 +353,13 @@ description: >
   
 expected_output: >
   A JSON object containing balanced journal entries ready for posting,
-  with entries requiring approval clearly flagged. Partial payments must
-  have exactly 1 credit and 2 debit lines (for receipts) or 1 debit and 2 credit 
-  lines (for payments). Unreconciled bank transactions should be included with 
-  appropriate account allocation. All entries must follow Indian Accounting 
-  Standards (Ind AS) with proper GST treatment.
+  with entries requiring approval clearly flagged. Partial payments are 
+  recorded simply as: Dr. Bank Account, Cr. Customer/Vendor Account (for receipts)
+  or Dr. Vendor Account, Cr. Bank Account (for payments). GST is not considered 
+  in payment entries - GST is accounted for when invoices are created. Multiple 
+  partial payments can be recorded against invoices. Unreconciled bank transactions 
+  should be included with appropriate account allocation. All entries must follow 
+  Indian Accounting Standards (Ind AS) with proper GST treatment at invoice level.
 context:
   - ingest_financial_data
   - reconcile_bank_transactions
