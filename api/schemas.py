@@ -121,6 +121,7 @@ class BankTransactionResponse(BaseModel):
     reference: Optional[str]
     type: str
     status: str
+    category: Optional[str]
     created_at: datetime
     
     class Config:

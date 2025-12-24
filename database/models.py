@@ -183,6 +183,7 @@ class BankTransaction(Base):
     reference = Column(String, nullable=True)
     type = Column(SQLEnum(TransactionType), nullable=False)  # credit or debit
     status = Column(SQLEnum(TransactionStatus), default=TransactionStatus.UNMATCHED)
+    category = Column(String, nullable=True)  # AI-categorized transaction category
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
