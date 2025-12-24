@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookkeeper - Transaction Reconciliation</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="alternate icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900">Transaction Reconciliation</h2>
+                        <p class="text-sm text-gray-500">Match bank statements with invoices automatically or manually</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="runAutoReconciliation()" class="btn-primary">
+                            <i class="fas fa-bolt mr-2"></i>Auto-Match All
+                        </button>
+                        <button onclick="loadData()" class="btn-secondary">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-600"></i>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-900" id="matchedCount">0</div>
+                        <div class="text-sm text-gray-500">Matched Transactions</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-circle text-amber-600"></i>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-900" id="pendingCount">0</div>
+                        <div class="text-sm text-gray-500">Pending Match</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-rupee-sign text-blue-600"></i>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-900" id="matchedValue">₹0</div>
+                        <div class="text-sm text-gray-500">Matched Value</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-percentage text-purple-600"></i>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-900" id="matchAccuracy">0%</div>
+                        <div class="text-sm text-gray-500">Match Accuracy</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                    <div class="border-b border-gray-200">
+                        <div class="flex">
+                            <button class="tab-btn active px-6 py-4 text-sm font-semibold border-b-2 border-blue-600 text-blue-600" data-tab="matched">
+                                <i class="fas fa-check-circle mr-2"></i>Matched
+                                <span class="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs" id="matchedTabCount">0</span>
+                            </button>
+                            <button class="tab-btn px-6 py-4 text-sm font-semibold text-gray-500 hover:text-gray-700" data-tab="unmatched">
+                                <i class="fas fa-exclamation-circle mr-2"></i>Unmatched
+                                <span class="ml-2 bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs" id="unmatchedTabCount">0</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Matched Section -->
+                <div class="section-content active" id="matched-section">
+                    <div class="space-y-4" id="matchedList"></div>
+                </div>
+
+                <!-- Unmatched Section -->
+                <div class="section-content hidden" id="unmatched-section">
+                    <div class="grid grid-cols-3 gap-6 mb-6">
+                        <!-- Invoices Panel -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                            <i class="fas fa-file-invoice text-purple-600"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-gray-900">Invoices & Bills</h3>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button class="filter-btn active text-xs px-2 py-1 rounded bg-blue-100 text-blue-600" data-filter="all">All</button>
+                                        <button class="filter-btn text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="sales">Sales</button>
+                                        <button class="filter-btn text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="purchase">Purchase</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 border-b border-gray-200">
+                                <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Search invoices..." id="invoiceSearch">
+                            </div>
+                            <div class="p-3 max-h-96 overflow-y-auto" id="invoiceList"></div>
+                        </div>
+
+                        <!-- Center Match Button -->
+                        <div class="flex flex-col items-center justify-center">
+                            <button class="match-btn w-16 h-16 rounded-full border-2 border-dashed border-gray-300 bg-white hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center text-gray-400 hover:text-blue-600" id="matchBtn">
+                                <i class="fas fa-link text-2xl"></i>
+                            </button>
+                            <p class="text-xs text-gray-500 mt-3 text-center max-w-20" id="matchHint">Select entries to match</p>
+                        </div>
+
+                        <!-- Bank Transactions Panel -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                            <i class="fas fa-university text-blue-600"></i>
+                                        </div>
+                                        <h3 class="font-semibold text-gray-900">Bank Entries</h3>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button class="filter-btn active text-xs px-2 py-1 rounded bg-blue-100 text-blue-600" data-filter="all">All</button>
+                                        <button class="filter-btn text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="credit">Credits</button>
+                                        <button class="filter-btn text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="debit">Debits</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 border-b border-gray-200">
+                                <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Search bank entries..." id="bankSearch">
+                            </div>
+                            <div class="p-3 max-h-96 overflow-y-auto" id="bankList"></div>
+                        </div>
+                    </div>
+
+                    <!-- AI Suggestions -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                        <div class="p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-white">
+                                        <i class="fas fa-brain"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">AI Suggested Matches</h3>
+                                        <p class="text-xs text-gray-500">Based on amount, date, and party name</p>
+                                    </div>
+                                </div>
+                                <button class="btn-secondary text-sm" id="acceptAllSuggestions">
+                                    Accept All (<span id="suggestionCount">0</span>)
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4 space-y-3" id="suggestionsList"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Selection Indicator -->
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg border border-gray-200 px-6 py-3 hidden items-center gap-4 z-50" id="selectionIndicator">
+        <div class="text-sm text-gray-600">
+            <strong class="text-gray-900" id="selectionCount">0</strong> items selected
+        </div>
+        <div class="flex gap-4 pl-4 border-l border-gray-200">
+            <div class="text-center">
+                <div class="text-xs text-gray-500 uppercase">Invoice</div>
+                <div class="text-sm font-mono font-semibold" id="selectedInvoiceAmount">-</div>
+            </div>
+            <div class="text-center">
+                <div class="text-xs text-gray-500 uppercase">Bank</div>
+                <div class="text-sm font-mono font-semibold" id="selectedBankAmount">-</div>
+            </div>
+        </div>
+        <button class="btn-primary text-sm" id="confirmMatch">Confirm Match</button>
+        <button class="btn-secondary text-sm" id="clearSelection">Clear</button>
+    </div>
+
+    <!-- Toast -->
+    <div class="fixed bottom-6 right-6 bg-white rounded-lg shadow-lg border border-green-500 px-4 py-3 hidden items-center gap-3 z-50" id="toast">
+        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-check text-green-600"></i>
+        </div>
+        <div>
+            <h4 class="font-semibold text-gray-900 text-sm" id="toastTitle">Match Created</h4>
+            <p class="text-xs text-gray-500" id="toastMessage">Transaction successfully matched</p>
+        </div>
+    </div>
+
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/api.js"></script>
+    <script>
+        // Initialize sidebar
+        initSidebar('reconciliation.html');
+
+        let matchedTransactions = [];
+        let unmatchedInvoices = [];
+        let unmatchedBank = [];
+        let selectedInvoice = null;
+        let selectedBank = null;
+
+        function formatCurrency(amount) {
+            const absAmount = Math.abs(amount);
+            if (absAmount >= 100000) return (amount >= 0 ? '+' : '-') + '₹' + (absAmount / 100000).toFixed(2) + 'L';
+            return (amount >= 0 ? '+' : '-') + '₹' + absAmount.toLocaleString('en-IN');
+        }
+
+        function formatCurrencyShort(amount) {
+            return '₹' + Math.abs(amount).toLocaleString('en-IN');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        async function loadData() {
+            try {
+                // Load matched reconciliations
+                const reconciliations = await apiRequest('/reconciliations');
+                matchedTransactions = reconciliations.map(rec => ({
+                    id: rec.reconciliation_id,
+                    invoice: {
+                        id: rec.invoice?.invoice_number || 'N/A',
+                        party: rec.invoice?.vendor?.name || rec.invoice?.buyer?.name || 'Unknown',
+                        date: formatDate(rec.invoice?.invoice_date),
+                        gst: rec.invoice?.vendor?.gstin || rec.invoice?.buyer?.gstin || '',
+                        amount: rec.invoice?.total_amount || 0,
+                        type: rec.invoice?.invoice_type || 'sales'
+                    },
+                    bank: {
+                        id: rec.transaction?.reference || '',
+                        party: rec.transaction?.description || '',
+                        date: formatDate(rec.transaction?.date),
+                        bank: 'Bank',
+                        amount: rec.transaction?.type === 'credit' ? rec.transaction?.amount : -rec.transaction?.amount
+                    },
+                    matchType: rec.match_confidence ? 'auto' : 'manual',
+                    confidence: rec.match_confidence ? Math.round(rec.match_confidence * 100) : null
+                }));
+
+                // Load unmatched invoices
+                const invoices = await apiRequest('/invoices');
+                const matchedInvoiceIds = new Set(reconciliations.map(r => r.invoice_id).filter(Boolean));
+                unmatchedInvoices = invoices
+                    .filter(inv => !matchedInvoiceIds.has(inv.invoice_id))
+                    .map(inv => ({
+                        id: inv.invoice_id,
+                        invoiceNo: inv.invoice_number,
+                        party: inv.vendor?.name || inv.buyer?.name || 'Unknown',
+                        date: formatDate(inv.invoice_date),
+                        amount: inv.total_amount || 0,
+                        type: inv.invoice_type || 'sales'
+                    }));
+
+                // Load unmatched bank transactions
+                const transactions = await apiRequest('/bank-transactions');
+                const matchedTransactionIds = new Set(reconciliations.map(r => r.transaction_id).filter(Boolean));
+                unmatchedBank = transactions
+                    .filter(txn => !matchedTransactionIds.has(txn.transaction_id) && txn.status === 'unmatched')
+                    .map(txn => ({
+                        id: txn.transaction_id,
+                        ref: txn.reference || '',
+                        party: txn.description || '',
+                        date: formatDate(txn.date),
+                        bank: 'Bank',
+                        amount: txn.type === 'credit' ? txn.amount : -txn.amount
+                    }));
+
+                renderMatchedTransactions();
+                renderUnmatchedInvoices();
+                renderUnmatchedBank();
+                renderSuggestions();
+                updateCounts();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast('Error', 'Failed to load reconciliation data');
+            }
+        }
+
+        function renderMatchedTransactions() {
+            if (matchedTransactions.length === 0) {
+                document.getElementById('matchedList').innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                        <i class="fas fa-check-circle text-gray-300 text-5xl mb-4"></i>
+                        <h4 class="text-lg font-semibold text-gray-900 mb-2">No matched transactions</h4>
+                        <p class="text-gray-500">Start matching invoices with bank transactions</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('matchedList').innerHTML = matchedTransactions.map(match => `
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:border-green-500 transition-colors">
+                    <div class="bg-green-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2 text-green-700">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="text-sm font-semibold">${match.matchType === 'auto' ? 'Auto-Matched' : 'Manual Match'}</span>
+                        </div>
+                        ${match.confidence ? `
+                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                                <span>Confidence: ${match.confidence}%</span>
+                                <div class="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500 rounded-full" style="width: ${match.confidence}%"></div>
+                                </div>
+                            </div>
+                        ` : '<span class="text-sm text-gray-600">Verified by User</span>'}
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 p-4 items-center">
+                        <div>
+                            <div class="text-xs font-semibold text-gray-500 uppercase mb-2">${match.invoice.type === 'sales' ? 'Sales Invoice' : 'Purchase Bill'}</div>
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h4 class="font-semibold text-gray-900">${match.invoice.id} • ${match.invoice.party}</h4>
+                                    <p class="text-sm text-gray-500">${match.invoice.date}${match.invoice.gst ? ' • GST: ' + match.invoice.gst : ''}</p>
+                                </div>
+                                <div class="font-mono font-semibold ${match.invoice.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(match.invoice.amount)}</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="w-12 h-0.5 bg-gradient-to-r from-green-500 to-blue-500"></div>
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center my-2">
+                                <i class="fas fa-link text-green-600 text-xs"></i>
+                            </div>
+                            <div class="w-12 h-0.5 bg-gradient-to-r from-blue-500 to-green-500"></div>
+                        </div>
+                        <div>
+                            <div class="text-xs font-semibold text-gray-500 uppercase mb-2">Bank Statement</div>
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h4 class="font-semibold text-gray-900">${match.bank.party}</h4>
+                                    <p class="text-sm text-gray-500">${match.bank.date} • ${match.bank.bank}</p>
+                                </div>
+                                <div class="font-mono font-semibold ${match.bank.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(match.bank.amount)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderUnmatchedInvoices(filter = 'all') {
+            const filtered = filter === 'all' ? unmatchedInvoices : unmatchedInvoices.filter(inv => inv.type === filter);
+            if (filtered.length === 0) {
+                document.getElementById('invoiceList').innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-check-circle text-3xl mb-2 opacity-50"></i>
+                        <p class="text-sm">All matched!</p>
+                    </div>
+                `;
+                return;
+            }
+            document.getElementById('invoiceList').innerHTML = filtered.map(inv => `
+                <div class="entry-item p-3 rounded-lg border-2 cursor-pointer transition-all mb-2 ${selectedInvoice?.id === inv.id ? 'bg-purple-50 border-purple-500' : 'bg-gray-50 border-transparent hover:border-gray-300'}" data-id="${inv.id}" onclick="selectInvoice('${inv.id}')">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="font-semibold text-gray-900">${inv.party}</div>
+                        <div class="font-mono font-semibold ${inv.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(inv.amount)}</div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs text-gray-500">${inv.invoiceNo} • ${inv.date}</div>
+                        <span class="text-xs font-semibold px-2 py-1 rounded ${inv.type === 'sales' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">${inv.type}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderUnmatchedBank(filter = 'all') {
+            let filtered = unmatchedBank;
+            if (filter === 'credit') filtered = unmatchedBank.filter(b => b.amount >= 0);
+            if (filter === 'debit') filtered = unmatchedBank.filter(b => b.amount < 0);
+            if (filtered.length === 0) {
+                document.getElementById('bankList').innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-check-circle text-3xl mb-2 opacity-50"></i>
+                        <p class="text-sm">All matched!</p>
+                    </div>
+                `;
+                return;
+            }
+            document.getElementById('bankList').innerHTML = filtered.map(bank => `
+                <div class="entry-item p-3 rounded-lg border-2 cursor-pointer transition-all mb-2 ${selectedBank?.id === bank.id ? 'bg-blue-50 border-blue-500' : 'bg-gray-50 border-transparent hover:border-gray-300'}" data-id="${bank.id}" onclick="selectBank('${bank.id}')">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="font-semibold text-gray-900">${bank.party}</div>
+                        <div class="font-mono font-semibold ${bank.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(bank.amount)}</div>
+                    </div>
+                    <div class="text-xs text-gray-500">${bank.bank} • ${bank.date}</div>
+                </div>
+            `).join('');
+        }
+
+        function generateSuggestions() {
+            const suggestions = [];
+            unmatchedInvoices.forEach(inv => {
+                const matchingBank = unmatchedBank.find(b => Math.abs(b.amount - inv.amount) < 0.01);
+                if (matchingBank) {
+                    let confidence = 85;
+                    const partyKey = matchingBank.party.toLowerCase().substring(0, 4);
+                    if (inv.party.toLowerCase().includes(partyKey)) confidence = 98;
+                    suggestions.push({ invoice: inv, bank: matchingBank, confidence, reason: confidence > 95 ? 'Exact amount + similar party name' : 'Exact amount match' });
+                }
+            });
+            return suggestions;
+        }
+
+        function renderSuggestions() {
+            const suggestions = generateSuggestions();
+            document.getElementById('suggestionCount').textContent = suggestions.length;
+            if (suggestions.length === 0) {
+                document.getElementById('suggestionsList').innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-brain text-3xl mb-2 opacity-50"></i>
+                        <p class="text-sm">No suggestions</p>
+                        <p class="text-xs">AI couldn't find matching pairs</p>
+                    </div>
+                `;
+                return;
+            }
+            document.getElementById('suggestionsList').innerHTML = suggestions.map(s => `
+                <div class="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:border-purple-500 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold px-2 py-1 rounded ${s.confidence >= 95 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${s.confidence}% Match</span>
+                        <span class="text-xs text-gray-500">${s.reason}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 items-center">
+                        <div class="bg-white p-3 rounded border border-gray-200">
+                            <div class="text-xs font-semibold text-gray-500 uppercase mb-1">${s.invoice.type === 'sales' ? 'Sales Invoice' : 'Purchase Bill'}</div>
+                            <div class="font-semibold text-gray-900 text-sm">${s.invoice.party}</div>
+                            <div class="font-mono text-sm font-semibold ${s.invoice.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(s.invoice.amount)}</div>
+                            <div class="text-xs text-gray-500 mt-1">${s.invoice.invoiceNo} • ${s.invoice.date}</div>
+                        </div>
+                        <div class="flex justify-center">
+                            <i class="fas fa-arrow-right text-purple-500"></i>
+                        </div>
+                        <div class="bg-white p-3 rounded border border-gray-200">
+                            <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Bank Entry</div>
+                            <div class="font-semibold text-gray-900 text-sm">${s.bank.party}</div>
+                            <div class="font-mono text-sm font-semibold ${s.bank.amount >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(s.bank.amount)}</div>
+                            <div class="text-xs text-gray-500 mt-1">${s.bank.bank} • ${s.bank.date}</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end mt-3">
+                        <button class="btn-secondary text-xs" onclick="rejectSuggestion(this)">Reject</button>
+                        <button class="btn-primary text-xs" onclick="acceptSuggestion('${s.invoice.id}', '${s.bank.id}', this)">Accept Match</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectInvoice(id) {
+            selectedInvoice = selectedInvoice?.id === id ? null : unmatchedInvoices.find(i => i.id === id);
+            renderUnmatchedInvoices();
+            updateSelectionUI();
+        }
+
+        function selectBank(id) {
+            selectedBank = selectedBank?.id === id ? null : unmatchedBank.find(b => b.id === id);
+            renderUnmatchedBank();
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            const indicator = document.getElementById('selectionIndicator');
+            const matchBtn = document.getElementById('matchBtn');
+            const hint = document.getElementById('matchHint');
+            const count = (selectedInvoice ? 1 : 0) + (selectedBank ? 1 : 0);
+            document.getElementById('selectionCount').textContent = count;
+            document.getElementById('selectedInvoiceAmount').textContent = selectedInvoice ? formatCurrencyShort(Math.abs(selectedInvoice.amount)) : '-';
+            document.getElementById('selectedBankAmount').textContent = selectedBank ? formatCurrencyShort(Math.abs(selectedBank.amount)) : '-';
+            
+            if (selectedInvoice && selectedBank) {
+                const match = Math.abs(selectedInvoice.amount - selectedBank.amount) < 0.01;
+                const invoiceEl = document.getElementById('selectedInvoiceAmount');
+                const bankEl = document.getElementById('selectedBankAmount');
+                invoiceEl.className = 'text-sm font-mono font-semibold ' + (match ? 'text-green-600' : 'text-amber-600');
+                bankEl.className = 'text-sm font-mono font-semibold ' + (match ? 'text-green-600' : 'text-amber-600');
+                matchBtn.classList.add('border-blue-500', 'bg-blue-50', 'text-blue-600');
+                matchBtn.classList.remove('border-gray-300', 'text-gray-400');
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
+                hint.textContent = 'Click to match';
+            } else if (count > 0) {
+                matchBtn.classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-600');
+                matchBtn.classList.add('border-gray-300', 'text-gray-400');
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
+                hint.textContent = selectedInvoice ? 'Select bank entry' : 'Select invoice';
+            } else {
+                matchBtn.classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-600');
+                matchBtn.classList.add('border-gray-300', 'text-gray-400');
+                indicator.classList.add('hidden');
+                indicator.classList.remove('flex');
+                hint.textContent = 'Select entries to match';
+            }
+        }
+
+        async function createMatch(invoiceId, bankId) {
+            try {
+                await apiRequest('/reconcile/settle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        transaction_id: bankId,
+                        invoice_id: invoiceId
+                    })
+                });
+                
+                unmatchedInvoices = unmatchedInvoices.filter(i => i.id !== invoiceId);
+                unmatchedBank = unmatchedBank.filter(b => b.id !== bankId);
+                selectedInvoice = null;
+                selectedBank = null;
+                
+                await loadData();
+                updateSelectionUI();
+                showToast('Match Created', 'Transaction successfully matched');
+            } catch (error) {
+                console.error('Error creating match:', error);
+                showToast('Error', 'Failed to create match');
+            }
+        }
+
+        async function acceptSuggestion(invoiceId, bankId, btn) {
+            const card = btn.closest('.bg-gray-50');
+            card.classList.add('opacity-50', 'pointer-events-none');
+            await createMatch(invoiceId, bankId);
+        }
+
+        function rejectSuggestion(btn) {
+            const card = btn.closest('.bg-gray-50');
+            card.remove();
+            renderSuggestions();
+        }
+
+        function updateCounts() {
+            const matchedCount = matchedTransactions.length;
+            const pendingCount = unmatchedInvoices.length;
+            document.getElementById('matchedCount').textContent = matchedCount;
+            document.getElementById('pendingCount').textContent = pendingCount;
+            document.getElementById('matchedTabCount').textContent = matchedCount;
+            document.getElementById('unmatchedTabCount').textContent = pendingCount;
+            const totalValue = matchedTransactions.reduce((sum, m) => sum + Math.abs(m.invoice.amount), 0);
+            document.getElementById('matchedValue').textContent = '₹' + (totalValue / 100000).toFixed(1) + 'L';
+            const accuracy = matchedCount + pendingCount > 0 ? Math.round((matchedCount / (matchedCount + pendingCount)) * 100) : 0;
+            document.getElementById('matchAccuracy').textContent = accuracy + '%';
+        }
+
+        function showToast(title, message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }, 3000);
+        }
+
+        async function runAutoReconciliation() {
+            try {
+                showToast('Processing', 'Running automatic reconciliation...');
+                await apiRequest('/reconcile', { method: 'POST' });
+                await loadData();
+                showToast('Success', 'Automatic reconciliation completed');
+            } catch (error) {
+                console.error('Error running reconciliation:', error);
+                showToast('Error', 'Failed to run reconciliation');
+            }
+        }
+
+        // Event Listeners
+        document.querySelectorAll('.tab-btn').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(t => {
+                    t.classList.remove('active', 'border-b-2', 'border-blue-600', 'text-blue-600');
+                    t.classList.add('text-gray-500');
+                });
+                tab.classList.add('active', 'border-b-2', 'border-blue-600', 'text-blue-600');
+                tab.classList.remove('text-gray-500');
+                
+                document.querySelectorAll('.section-content').forEach(s => s.classList.add('hidden'));
+                document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+                
+                if (tab.dataset.tab === 'matched') {
+                    document.getElementById('matched-section').classList.remove('hidden');
+                    document.getElementById('matched-section').classList.add('active');
+                } else {
+                    document.getElementById('unmatched-section').classList.remove('hidden');
+                    document.getElementById('unmatched-section').classList.add('active');
+                }
+            });
+        });
+
+        document.querySelectorAll('#invoiceFilters .filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#invoiceFilters .filter-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-blue-100', 'text-blue-600');
+                    b.classList.add('bg-gray-100', 'text-gray-600');
+                });
+                e.target.classList.add('active', 'bg-blue-100', 'text-blue-600');
+                e.target.classList.remove('bg-gray-100', 'text-gray-600');
+                renderUnmatchedInvoices(e.target.dataset.filter);
+            });
+        });
+
+        document.querySelectorAll('#bankFilters .filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#bankFilters .filter-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-blue-100', 'text-blue-600');
+                    b.classList.add('bg-gray-100', 'text-gray-600');
+                });
+                e.target.classList.add('active', 'bg-blue-100', 'text-blue-600');
+                e.target.classList.remove('bg-gray-100', 'text-gray-600');
+                const filter = e.target.closest('.flex').querySelectorAll('.filter-btn').indexOf(e.target) === 0 ? 'all' : 
+                              e.target.textContent.toLowerCase().includes('credit') ? 'credit' : 'debit';
+                renderUnmatchedBank(filter);
+            });
+        });
+
+        document.getElementById('matchBtn').addEventListener('click', () => {
+            if (selectedInvoice && selectedBank) createMatch(selectedInvoice.id, selectedBank.id);
+        });
+
+        document.getElementById('confirmMatch').addEventListener('click', () => {
+            if (selectedInvoice && selectedBank) createMatch(selectedInvoice.id, selectedBank.id);
+        });
+
+        document.getElementById('clearSelection').addEventListener('click', () => {
+            selectedInvoice = null;
+            selectedBank = null;
+            renderUnmatchedInvoices();
+            renderUnmatchedBank();
+            updateSelectionUI();
+        });
+
+        document.getElementById('acceptAllSuggestions').addEventListener('click', async () => {
+            const suggestions = generateSuggestions();
+            for (const s of suggestions) {
+                await createMatch(s.invoice.id, s.bank.id);
+            }
+        });
+
+        document.getElementById('invoiceSearch').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            document.querySelectorAll('#invoiceList .entry-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(query) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('bankSearch').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            document.querySelectorAll('#bankList .entry-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(query) ? '' : 'none';
+            });
+        });
+
+        // Initial load
+        loadData();
+    </script>
+</body>
+</html>
