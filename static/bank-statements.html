@@ -72,19 +72,35 @@
         document.addEventListener('DOMContentLoaded', () => {
             bankUploadComponent = new FileUploadComponent({
                 containerId: 'bank-upload-component',
-                accept: '.csv',
+                accept: '.pdf',
                 multiple: false,
-                useBulkUpload: false,  // Disable bulk upload for bank statements (single file, CSV only)
-                uploadText: 'Upload Bank Statement (CSV)',
-                dragText: 'Click to select or drag & drop CSV file',
-                helpText: 'Supports CSV format with Date, Description, Debit, Credit columns',
+                useBulkUpload: false,  // Disable bulk upload for bank statements (single file, PDF only)
+                uploadText: 'Upload Bank Statement (PDF)',
+                dragText: 'Click to select or drag & drop PDF file',
+                helpText: 'Supports PDF bank statements from HDFC, ICICI, SBI and other Indian banks. Transactions will be automatically categorized.',
                 onUpload: async (file) => {
-                    const transactions = await window.uploadBankStatement(file);
-                    // Reload transactions after successful upload
-                    setTimeout(() => {
-                        loadTransactions();
-                    }, 500);
-                    return transactions;
+                    try {
+                        console.log('Uploading bank statement:', file.name);
+                        const transactions = await window.uploadBankStatement(file);
+                        console.log('Upload successful, transactions:', transactions);
+                        
+                        // Show success message
+                        if (transactions && transactions.length > 0) {
+                            alert(`Successfully uploaded ${transactions.length} transaction(s)!`);
+                        } else {
+                            alert('File uploaded but no transactions were found. Please check the file format.');
+                        }
+                        
+                        // Reload transactions after successful upload
+                        setTimeout(() => {
+                            loadTransactions();
+                        }, 1000);
+                        return transactions;
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert(`Upload failed: ${error.message || 'Unknown error'}`);
+                        throw error;
+                    }
                 }
             });
             
@@ -179,6 +195,17 @@
                             const badgeClass = statusColors[status.toLowerCase()] || 'bg-gray-50 text-gray-700 border border-gray-200';
                             return `<span class="px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${badgeClass}">${escapeHtml(statusUpper)}</span>`;
                         }
+                    },
+                    { 
+                        field: 'category', 
+                        headerName: 'Category',
+                        filter: 'agTextColumnFilter',
+                        sortable: true,
+                        cellRenderer: (params) => {
+                            if (!params.value) return '<span class="text-gray-400">-</span>';
+                            return `<span class="px-2.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">${escapeHtml(params.value)}</span>`;
+                        },
+                        flex: 1
                     }
                 ];
 

@@ -72,6 +72,12 @@ async function apiRequest(endpoint, options = {}) {
             }
         }
         
+        // Don't set Content-Type for FormData - browser will set it automatically with boundary
+        // If body is FormData, remove any Content-Type header to let browser set it
+        if (options.body instanceof FormData) {
+            delete headers['Content-Type'];
+        }
+        
         let response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers
@@ -308,10 +314,20 @@ async function uploadBankStatement(file) {
     const formData = new FormData();
     formData.append('file', file);
     
-    return apiRequest('/bank-statements', {
-        method: 'POST',
-        body: formData
-    });
+    // Add categorize parameter (defaults to true on backend, but explicit is better)
+    const url = '/bank-statements?categorize=true';
+    
+    try {
+        const result = await apiRequest(url, {
+            method: 'POST',
+            body: formData
+        });
+        console.log('Bank statement upload result:', result);
+        return result;
+    } catch (error) {
+        console.error('Bank statement upload error:', error);
+        throw error;
+    }
 }
 
 async function runReconciliation() {

@@ -1,10 +1,10 @@
 """
 Bank statement processing routes
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
 from typing import List
 from api.schemas import BankTransactionResponse
-from core.bank_parser import parse_bank_statement_csv
+from core.bank_parser import parse_bank_statement
 from core.auth import get_current_user
 from database.models import User
 import tempfile
@@ -14,20 +14,34 @@ router = APIRouter()
 
 
 @router.post("/bank-statements", response_model=List[BankTransactionResponse])
-async def upload_bank_statement(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    """Upload and process a bank statement CSV"""
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+async def upload_bank_statement(
+    file: UploadFile = File(...),
+    categorize: bool = Query(True, description="Whether to categorize transactions using AI"),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload and process a bank statement (CSV or PDF) with AI categorization"""
+    # Determine file extension
+    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+    
+    if file_ext not in ['.csv', '.pdf']:
+        raise HTTPException(
+            status_code=400,
+            detail="Only CSV and PDF files are supported"
+        )
     
     # Save uploaded file temporarily
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='wb') as tmp_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, mode='wb') as tmp_file:
         content = await file.read()
         tmp_file.write(content)
         tmp_path = tmp_file.name
     
     try:
-        # Parse bank statement
-        transactions = parse_bank_statement_csv(tmp_path, company_id=current_user.company_id)
+        # Parse bank statement (supports both CSV and PDF)
+        transactions = parse_bank_statement(
+            tmp_path,
+            company_id=current_user.company_id,
+            categorize=categorize
+        )
         return transactions
     except Exception as e:
         import logging
@@ -35,7 +49,7 @@ async def upload_bank_statement(file: UploadFile = File(...), current_user: User
         logger.error(f"Bank statement upload error: {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Failed to upload bank statement. Please try again later or contact support."
+            detail=f"Failed to upload bank statement: {str(e)}"
         )
     finally:
         # Clean up temp file
