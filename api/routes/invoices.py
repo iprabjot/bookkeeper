@@ -91,19 +91,55 @@ async def upload_invoice(file: UploadFile = File(...), current_user: User = Depe
                 logger.debug(f"Cleaned up temp file after saving to persistent storage")
 
 
-@router.get("/invoices", response_model=List[InvoiceResponse])
+@router.get("/invoices")
 async def list_invoices(current_user: User = Depends(get_current_user)):
-    """List all invoices for the authenticated user's company"""
+    """List all invoices for the authenticated user's company with vendor/buyer details"""
     from database.models import Invoice
     from database.db import get_db
+    from sqlalchemy.orm import joinedload
     
     db = next(get_db())
     try:
-        invoices = db.query(Invoice).filter(
+        invoices = db.query(Invoice).options(
+            joinedload(Invoice.vendor),
+            joinedload(Invoice.buyer)
+        ).filter(
             Invoice.company_id == current_user.company_id
         ).order_by(Invoice.created_at.desc()).all()
         
-        return invoices
+        # Convert to dict with nested relationships
+        result = []
+        for inv in invoices:
+            inv_dict = {
+                "invoice_id": inv.invoice_id,
+                "company_id": inv.company_id,
+                "vendor_id": inv.vendor_id,
+                "buyer_id": inv.buyer_id,
+                "invoice_type": inv.invoice_type,
+                "invoice_number": inv.invoice_number,
+                "invoice_date": inv.invoice_date,
+                "amount": inv.amount,
+                "total_amount": inv.amount,  # Alias for frontend
+                "taxable_amount": inv.taxable_amount,
+                "igst_amount": inv.igst_amount,
+                "cgst_amount": inv.cgst_amount,
+                "sgst_amount": inv.sgst_amount,
+                "status": inv.status,
+                "created_at": inv.created_at,
+                "vendor": {
+                    "vendor_id": inv.vendor.vendor_id,
+                    "name": inv.vendor.name,
+                    "gstin": inv.vendor.gstin
+                } if inv.vendor else None,
+                "buyer": {
+                    "buyer_id": inv.buyer.buyer_id,
+                    "name": inv.buyer.name,
+                    "gstin": inv.buyer.gstin
+                } if inv.buyer else None
+            }
+            result.append(inv_dict)
+        
+        return result
     finally:
         db.close()
 

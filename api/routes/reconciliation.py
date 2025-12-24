@@ -37,21 +37,68 @@ async def settle_reconciliation_endpoint(request: SettlementRequest, current_use
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/reconciliations", response_model=List[ReconciliationResponse])
+@router.get("/reconciliations")
 async def list_reconciliations(current_user: User = Depends(get_current_user)):
-    """List all reconciliations for the authenticated user's company"""
-    from database.models import Reconciliation, BankTransaction
+    """List all reconciliations for the authenticated user's company with invoice and transaction details"""
+    from database.models import Reconciliation, BankTransaction, Invoice
     from database.db import get_db
+    from sqlalchemy.orm import joinedload
     
     db = next(get_db())
     try:
         reconciliations = db.query(Reconciliation).join(
             BankTransaction, Reconciliation.transaction_id == BankTransaction.transaction_id
+        ).options(
+            joinedload(Reconciliation.transaction),
+            joinedload(Reconciliation.invoice).joinedload(Invoice.vendor),
+            joinedload(Reconciliation.invoice).joinedload(Invoice.buyer)
         ).filter(
             BankTransaction.company_id == current_user.company_id
         ).order_by(Reconciliation.created_at.desc()).all()
         
-        return reconciliations
+        # Convert to dict with nested relationships
+        result = []
+        for rec in reconciliations:
+            rec_dict = {
+                "reconciliation_id": rec.reconciliation_id,
+                "transaction_id": rec.transaction_id,
+                "invoice_id": rec.invoice_id,
+                "match_type": rec.match_type,
+                "match_confidence": rec.match_confidence,
+                "status": rec.status,
+                "settled_at": rec.settled_at,
+                "created_at": rec.created_at,
+                "transaction": {
+                    "transaction_id": rec.transaction.transaction_id,
+                    "date": rec.transaction.date,
+                    "amount": rec.transaction.amount,
+                    "type": rec.transaction.type,
+                    "description": rec.transaction.description,
+                    "reference": rec.transaction.reference,
+                    "status": rec.transaction.status,
+                    "category": rec.transaction.category
+                } if rec.transaction else None,
+                "invoice": {
+                    "invoice_id": rec.invoice.invoice_id,
+                    "invoice_number": rec.invoice.invoice_number,
+                    "invoice_date": rec.invoice.invoice_date,
+                    "invoice_type": rec.invoice.invoice_type,
+                    "total_amount": rec.invoice.amount,
+                    "vendor": {
+                        "vendor_id": rec.invoice.vendor.vendor_id,
+                        "name": rec.invoice.vendor.name,
+                        "gstin": rec.invoice.vendor.gstin
+                    } if rec.invoice.vendor else None,
+                    "buyer": {
+                        "buyer_id": rec.invoice.buyer.buyer_id,
+                        "name": rec.invoice.buyer.name,
+                        "gstin": rec.invoice.buyer.gstin
+                    } if rec.invoice.buyer else None
+                } if rec.invoice else None
+            }
+            result.append(rec_dict)
+        
+        return result
     finally:
         db.close()
 
